@@ -56,7 +56,3 @@ class FileHandler:
                         break
                     client_socket.send(chunk)
                     sent += len(chunk)
-            
-            return True, sent
-        except Exception as e:
-            return False, str(e)

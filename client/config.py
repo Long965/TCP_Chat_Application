@@ -6,6 +6,3 @@ PORT = 5555
 CLIENT_DOWNLOADS = "../files/client_downloads/"
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 
-# Buffer sizes
-BUFFER_SIZE = 4096
-FILE_BUFFER = 8192

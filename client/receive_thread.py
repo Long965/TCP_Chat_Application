@@ -67,9 +67,6 @@ class ReceiveThread(threading.Thread):
             # Thông báo thành công
             self.ui.show_message("SERVER", msg["content"])
         
-        elif msg_type == MessageType.ERROR:
-            # Thông báo lỗi
-            self.ui.show_message("ERROR", msg["content"])
     
     def stop(self):
         """Dừng thread"""

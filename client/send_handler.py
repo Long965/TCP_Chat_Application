@@ -37,12 +37,3 @@ class SendHandler:
         success, result = FileHandler.send_file(self.client_socket, filepath)
         return success, result
     
-    def send_leave(self):
-        """Gửi thông báo rời phòng"""
-        try:
-            msg = Protocol.encode_message(
-                MessageType.LEAVE, self.username, ""
-            )
-            self.client_socket.send(msg)
-        except:
-            pass

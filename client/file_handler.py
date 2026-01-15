@@ -1,3 +1,7 @@
+"""
+Xử lý gửi và nhận file trên client
+"""
+
 import os
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -7,8 +11,8 @@ import config
 
 class FileHandler:
     @staticmethod
-    def send_file(client_socket, filepath):
-        """Gửi file tới server"""
+    def send_file(client_socket, filepath, progress_callback=None):
+        """Gửi file tới server với progress callback"""
         try:
             if not os.path.exists(filepath):
                 return False, "File không tồn tại!"
@@ -39,14 +43,21 @@ class FileHandler:
                     chunk = f.read(config.FILE_BUFFER)
                     if not chunk:
                         break
-                    client_socket.send(chunk)
+                    client_socket.sendall(chunk)  # Dùng sendall thay vì send
                     sent += len(chunk)
                     
-                    # Hiển thị tiến trình
-                    progress = (sent / filesize) * 100
-                    print(f"\rĐang gửi: {progress:.1f}%", end="", flush=True)
+                    # Callback progress
+                    if progress_callback:
+                        progress = (sent / filesize) * 100
+                        progress_callback(progress)
+                    else:
+                        # Hiển thị tiến trình trong console
+                        progress = (sent / filesize) * 100
+                        print(f"\rĐang gửi: {progress:.1f}%", end="", flush=True)
             
-            print()  # Xuống dòng
+            if not progress_callback:
+                print()  # Xuống dòng
+            
             return True, f"Đã gửi {filename} ({sent} bytes)"
             
         except Exception as e:
@@ -83,3 +94,17 @@ class FileHandler:
                 return False, "File không nhận đủ dữ liệu"
         except Exception as e:
             return False, str(e)
+    
+    @staticmethod
+    def is_image(filename):
+        """Kiểm tra file có phải ảnh không"""
+        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp']
+        ext = os.path.splitext(filename)[1].lower()
+        return ext in image_extensions
+    
+    @staticmethod
+    def is_video(filename):
+        """Kiểm tra file có phải video không"""
+        video_extensions = ['.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv']
+        ext = os.path.splitext(filename)[1].lower()
+        return ext in video_extensions

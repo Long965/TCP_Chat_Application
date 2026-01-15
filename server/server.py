@@ -68,6 +68,3 @@ class ChatServer:
             self.server_socket.close()
         print("[SERVER] Đã tắt!")
 
-if __name__ == "__main__":
-    server = ChatServer()
-    server.start()
