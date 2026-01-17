@@ -7,6 +7,10 @@ from tkinter import CENTER, BOTH
 from common.protocol import Protocol, MessageType
 import time
 import threading
+import base64
+import cv2
+import numpy as np
+from PIL import Image, ImageTk
 
 # WebRTC imports
 try:
@@ -337,34 +341,78 @@ class CallUI:
             print(f"Video capture error: {e}")
     
     def _update_video_frame(self):
-        """Cập nhật frame video"""
+        """Cập nhật frame video: Hiển thị local + Gửi đi"""
         if not self.call_active or not self.is_camera_on:
             return
-        
+
+        # --- CẤU HÌNH (Dễ dàng điều chỉnh tại đây) ---
+        SEND_WIDTH, SEND_HEIGHT = 320, 240  # Giảm độ phân giải khi gửi để mượt hơn
+        JPEG_QUALITY = 50                   # Chất lượng ảnh (0-100), thấp hơn = nhanh hơn
+        FPS_TARGET = 30                     # Tốc độ khung hình
+        # ---------------------------------------------
+
         try:
             ret, frame = self.video_capture.read()
-            
             if ret:
-                # Convert BGR to RGB
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                
-                # Mirror the frame
-                frame = cv2.flip(frame, 1)
-                
-                # Convert to PIL Image
-                image = Image.fromarray(frame)
-                photo = ImageTk.PhotoImage(image=image)
-                
-                # Update canvas
-                self.video_canvas.delete("all")
-                self.video_canvas.create_image(0, 0, image=photo, anchor="nw")
-                self.video_canvas.image = photo  # Keep reference
-                
-                # Schedule next update (30 FPS)
-                self.window.after(33, self._update_video_frame)
-        
+                # 1. Xử lý hiển thị Local (Mirror)
+                # Chỉ hiển thị local nếu chưa có video từ đối phương (hoặc bạn có thể vẽ PIP)
+                if not hasattr(self, 'has_peer_video') or not self.has_peer_video:
+                    self._render_frame_to_canvas(frame)
+
+                # 2. Xử lý gửi đi (Send)
+                try:
+                    # Resize nhỏ lại để gửi qua mạng
+                    frame_small = cv2.resize(frame, (SEND_WIDTH, SEND_HEIGHT))
+                    
+                    # Nén thành JPEG
+                    _, buffer = cv2.imencode('.jpg', frame_small, [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY])
+                    
+                    # Mã hóa Base64
+                    jpg_as_text = base64.b64encode(buffer).decode('utf-8')
+                    
+                    # Gửi qua socket
+                    from common.protocol import Protocol, MessageType
+                    Protocol.send_message(
+                        self.client.socket,
+                        MessageType.VIDEO_DATA,
+                        {
+                            "recipient": self.peer,
+                            "data": jpg_as_text
+                        }
+                    )
+                except Exception as e:
+                    print(f"Send video error: {e}")
+
+            # Loop
+            self.window.after(int(1000/FPS_TARGET), self._update_video_frame)
+
         except Exception as e:
             print(f"Frame update error: {e}")
+
+    def _render_frame_to_canvas(self, frame):
+        """Hàm hỗ trợ vẽ frame lên canvas"""
+        try:
+            # Convert màu BGR -> RGB
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            # Nếu là camera trước (selfie), lật ngược lại cho giống gương
+            if not hasattr(self, 'has_peer_video') or not self.has_peer_video:
+                 frame_rgb = cv2.flip(frame_rgb, 1)
+
+            # Resize cho vừa Canvas
+            canvas_width = self.video_canvas.winfo_width()
+            canvas_height = self.video_canvas.winfo_height()
+            if canvas_width > 1 and canvas_height > 1: # Tránh lỗi khi window chưa load xong
+                frame_rgb = cv2.resize(frame_rgb, (canvas_width, canvas_height))
+
+            image = Image.fromarray(frame_rgb)
+            photo = ImageTk.PhotoImage(image=image)
+
+            self.video_canvas.delete("all")
+            self.video_canvas.create_image(0, 0, image=photo, anchor="nw")
+            self.video_canvas.image = photo # Giữ tham chiếu
+        except Exception as e:
+            pass
     
     def _start_audio_streaming(self):
         """Bắt đầu audio streaming"""
@@ -397,11 +445,68 @@ class CallUI:
             print(f"Audio streaming error: {e}")
     
     def _audio_callback(self, in_data, frame_count, time_info, status):
-        """Callback để xử lý audio data"""
-        # TODO: Gửi audio data qua socket đến peer
-        # Protocol.send_message(..., MessageType.AUDIO_DATA, {"data": in_data})
+        """Callback xử lý audio: Thu từ mic -> Gửi đi"""
+        if self.call_active and not self.is_muted:
+            try:
+                # Mã hóa dữ liệu âm thanh raw sang Base64
+                data_str = base64.b64encode(in_data).decode('utf-8')
+                
+                # Gửi qua socket
+                # Lưu ý: socket.sendall an toàn với thread trong Python
+                from common.protocol import Protocol, MessageType
+                Protocol.send_message(
+                    self.client.socket,
+                    MessageType.AUDIO_DATA,
+                    {
+                        "recipient": self.peer,
+                        "data": data_str
+                    }
+                )
+            except Exception as e:
+                # Không print lỗi liên tục để tránh spam console
+                pass
+                
         return (in_data, pyaudio.paContinue)
     
+    # Thêm các hàm này vào class CallUI
+
+    def process_incoming_video(self, data_str):
+        """Xử lý video nhận được từ đối phương"""
+        try:
+            # Đánh dấu là đã có video từ peer (để ngừng hiển thị local mirror)
+            self.has_peer_video = True
+            
+            # Decode Base64 -> Bytes
+            img_data = base64.b64decode(data_str)
+            
+            # Bytes -> Numpy Array
+            np_arr = np.frombuffer(img_data, dtype=np.uint8)
+            
+            # Decode JPEG -> Frame
+            frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            
+            if frame is not None:
+                self._render_frame_to_canvas(frame)
+                
+                # Xóa placeholder text nếu còn
+                if hasattr(self, 'placeholder_text'):
+                    self.video_canvas.delete(self.placeholder_text)
+                    del self.placeholder_text
+                    
+        except Exception as e:
+            print(f"Decode video error: {e}")
+
+    def process_incoming_audio(self, data_str):
+        """Xử lý audio nhận được từ đối phương"""
+        try:
+            if self.audio_output:
+                # Decode Base64 -> Raw bytes
+                audio_data = base64.b64decode(data_str)
+                # Phát ra loa
+                self.audio_output.write(audio_data)
+        except Exception as e:
+            print(f"Decode audio error: {e}")
+
     def _update_timer(self):
         """Cập nhật bộ đếm thời gian"""
         if self.call_active and self.start_time:

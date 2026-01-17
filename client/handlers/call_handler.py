@@ -30,7 +30,21 @@ class CallHandler:
         
         # Hiển thị incoming call UI
         self.client.root.after(0, self._show_incoming_call, caller, call_type)
+    # Thêm các method xử lý data vào class CallHandler
     
+    def handle_video_data(self, data):
+        """Nhận dữ liệu video từ server"""
+        if self.client.current_call:
+            video_content = data.get("data")
+            # Gọi giao diện để hiển thị
+            self.client.current_call.process_incoming_video(video_content)
+
+    def handle_audio_data(self, data):
+        """Nhận dữ liệu audio từ server"""
+        if self.client.current_call:
+            audio_content = data.get("data")
+            # Gọi giao diện để phát âm thanh
+            self.client.current_call.process_incoming_audio(audio_content)
     def _show_incoming_call(self, caller, call_type):
         """Hiển thị UI cuộc gọi đến"""
         call_ui = CallUI(self.client, caller, call_type, is_caller=False)

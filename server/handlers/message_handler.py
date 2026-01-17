@@ -142,3 +142,26 @@ class MessageHandler:
                     "data": data.get("data")
                 }
             )
+    # Trong method handle_message hoặc tạo method riêng
+# Thêm method này vào class MessageHandler
+    def handle_media_data(self, client_socket, username, msg_type, data):
+        """
+        Chuyển tiếp dữ liệu media (Video/Audio) trực tiếp đến người nhận
+        """
+        recipient = data.get("recipient")
+        media_content = data.get("data") # Dữ liệu đã mã hóa Base64
+        
+        # Nếu người nhận đang online, chuyển tiếp ngay lập tức
+        if recipient and recipient in self.server.clients:
+            try:
+                from common.protocol import Protocol
+                Protocol.send_message(
+                    self.server.clients[recipient],
+                    msg_type,
+                    {
+                        "sender": username,
+                        "data": media_content
+                    }
+                )
+            except Exception as e:
+                print(f"Error relaying media to {recipient}: {e}")

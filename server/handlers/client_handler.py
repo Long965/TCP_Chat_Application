@@ -117,7 +117,15 @@ class ClientHandler:
                         MessageType.WEBRTC_ICE,
                         data
                     )
-                
+                # Thêm xử lý cho VIDEO_DATA và AUDIO_DATA
+                elif msg_type in [MessageType.VIDEO_DATA, MessageType.AUDIO_DATA]:
+                    self.message_handler.handle_media_data(
+                        self.client_socket,
+                        self.username,
+                        msg_type,
+                        data
+                    )
+
                 # Xử lý PING
                 elif msg_type == MessageType.PING:
                     Protocol.send_message(self.client_socket, MessageType.PONG, {})

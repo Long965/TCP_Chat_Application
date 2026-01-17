@@ -37,6 +37,10 @@ class MessageType:
     CALL_END = "CALL_END"                   # Kết thúc cuộc gọi
     CALL_BUSY = "CALL_BUSY"                 # Đang bận
     
+    # Media Data - THÊM MỚI
+    VIDEO_DATA = "VIDEO_DATA"      # Dữ liệu hình ảnh (Frame)
+    AUDIO_DATA = "AUDIO_DATA"      # Dữ liệu âm thanh (Chunk)
+    
     # WebRTC Signaling
     WEBRTC_OFFER = "WEBRTC_OFFER"           # SDP Offer
     WEBRTC_ANSWER = "WEBRTC_ANSWER"         # SDP Answer

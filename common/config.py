@@ -3,7 +3,7 @@ Cấu hình chung cho ứng dụng chat
 """
 
 # Server settings
-DEFAULT_HOST = "0.0.0.0"
+DEFAULT_HOST = "localhost"
 DEFAULT_PORT = 5555
 DEFAULT_SERVER = "127.0.0.1:5555"
 
