@@ -1,5 +1,5 @@
 """
-Xử lý các loại message nhận được từ server - CẬP NHẬT
+Xử lý các loại message nhận được từ server
 Client/handlers/message_handler.py
 """
 
@@ -13,35 +13,29 @@ class MessageHandler:
     def handle_message(self, msg_type, data):
         """Xử lý message dựa vào loại"""
         
-        # TEXT MESSAGE (Group chat)
+        # TEXT MESSAGE
         if msg_type == MessageType.TEXT:
-            recipient = data.get("recipient")
+            # Lưu vào history
+            self.client.add_message(data)
             
-            # Nếu có recipient -> tin nhắn riêng
-            if recipient:
-                self._handle_private_message(data)
-            else:
-                # Tin nhắn nhóm
-                self.client.root.after(0, self.display_text_message, data)
+            # Hiển thị nếu đang ở view tương ứng
+            self.client.root.after(0, self.display_message_in_current_view, data)
         
         # FILE INFO
         elif msg_type == MessageType.FILE_INFO:
             status = data.get("status")
             
-            # Server báo "Ready" -> Báo cho thread upload gửi dữ liệu
             if status == "ready":
                 self.client.upload_permission = True
                 self.client.upload_event.set()
                 return
             
-            # Server báo "Sending" -> Nhận dữ liệu file
             elif status == "sending":
                 filename = data.get("filename")
                 filesize = data.get("filesize")
                 self.client.file_handler.handle_file_download_data(filename, filesize)
                 return
             
-            # Hiển thị thông báo có file mới
             else:
                 self.client.root.after(0, self.display_file_message, data)
         
@@ -57,7 +51,6 @@ class MessageHandler:
             self.client.root.after(0, self.show_system_message,
                                   f"❌ Lỗi file: {err_msg}")
             
-            # Mở khóa nếu đang đợi upload
             self.client.upload_permission = False
             self.client.upload_event.set()
         
@@ -76,7 +69,7 @@ class MessageHandler:
             self.client.root.after(0, self.show_system_message,
                                   f"👋 {username} đã offline")
         
-        # CALL HANDLING - NEW
+        # CALL HANDLING
         elif msg_type == MessageType.CALL_REQUEST:
             self.client.call_handler.handle_call_request(data)
         
@@ -101,39 +94,37 @@ class MessageHandler:
         elif msg_type == MessageType.WEBRTC_ICE:
             self.client.call_handler.handle_webrtc_ice(data)
     
-    def _handle_private_message(self, data):
-        """Xử lý tin nhắn riêng tư"""
+    def display_message_in_current_view(self, data):
+        """Hiển thị message nếu phù hợp với view hiện tại"""
+        if not self.client.chat_ui:
+            return
+        
         sender = data.get("sender")
         recipient = data.get("recipient")
+        current_chat = self.client.chat_ui.current_chat
         
-        # Xác định người chat (không phải mình)
-        peer = sender if sender != self.client.username else recipient
+        # Nếu đang ở group chat
+        if current_chat is None:
+            # Chỉ hiển thị tin nhắn không có recipient (group messages)
+            if not recipient:
+                MessageUI.display_text_message(
+                    self.client.chat_ui.messages_container,
+                    data,
+                    self.client.username,
+                    self.client.colors
+                )
         
-        # Kiểm tra xem có cửa sổ chat với người này chưa
-        if peer in self.client.private_chats:
-            # Hiển thị trong cửa sổ đã mở
-            self.client.root.after(0, 
-                self.client.private_chats[peer].display_message, data)
+        # Nếu đang ở private chat
         else:
-            # Tạo cửa sổ chat mới và hiển thị
-            from client.ui.private_chat_ui import PrivateChatUI
-            
-            def create_and_show():
-                private_chat = PrivateChatUI(self.client, peer)
-                self.client.private_chats[peer] = private_chat
-                private_chat.display_message(data)
-            
-            self.client.root.after(0, create_and_show)
-    
-    def display_text_message(self, data):
-        """Hiển thị tin nhắn text trong group chat"""
-        if self.client.chat_ui:
-            MessageUI.display_text_message(
-                self.client.chat_ui.messages_container,
-                data,
-                self.client.username,
-                self.client.colors
-            )
+            # Hiển thị nếu tin nhắn liên quan đến conversation này
+            if (sender == current_chat and recipient == self.client.username) or \
+               (sender == self.client.username and recipient == current_chat):
+                MessageUI.display_text_message(
+                    self.client.chat_ui.messages_container,
+                    data,
+                    self.client.username,
+                    self.client.colors
+                )
     
     def display_file_message(self, data):
         """Hiển thị thông báo file"""

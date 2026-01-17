@@ -1,11 +1,23 @@
 """
-Giao diện Video/Audio Call
+Giao diện Video/Audio Call với WebRTC thực
 """
 
-from tkinter import Frame, Label, Button, Toplevel
+from tkinter import Frame, Label, Button, Toplevel, Canvas
 from tkinter import CENTER, BOTH
 from common.protocol import Protocol, MessageType
 import time
+import threading
+
+# WebRTC imports
+try:
+    import cv2
+    import numpy as np
+    from PIL import Image, ImageTk
+    import pyaudio
+    WEBRTC_AVAILABLE = True
+except ImportError:
+    WEBRTC_AVAILABLE = False
+    print("⚠️  WebRTC dependencies not available. Install: opencv-python, pyaudio")
 
 class CallUI:
     def __init__(self, client, peer_username, call_type, is_caller=False):
@@ -17,17 +29,29 @@ class CallUI:
         self.call_active = False
         self.start_time = None
         
+        # WebRTC components
+        self.video_capture = None
+        self.audio_stream = None
+        self.audio_output = None
+        self.is_muted = False
+        self.is_camera_on = True
+        
         # Tạo cửa sổ call
         self.window = Toplevel(client.root)
         self.window.title(f"{'Video' if call_type == 'video' else 'Audio'} Call")
-        self.window.geometry("600x500" if call_type == "video" else "400x300")
-        self.window.resizable(False, False)
+        
+        if call_type == "video":
+            self.window.geometry("800x600")
+        else:
+            self.window.geometry("400x300")
         
         # Center window
         self.window.update_idletasks()
-        x = (self.window.winfo_screenwidth() // 2) - (600 if call_type == "video" else 400) // 2
-        y = (self.window.winfo_screenheight() // 2) - (500 if call_type == "video" else 300) // 2
-        self.window.geometry(f"{'600x500' if call_type == 'video' else '400x300'}+{x}+{y}")
+        w = 800 if call_type == "video" else 400
+        h = 600 if call_type == "video" else 300
+        x = (self.window.winfo_screenwidth() // 2) - w // 2
+        y = (self.window.winfo_screenheight() // 2) - h // 2
+        self.window.geometry(f"{w}x{h}+{x}+{y}")
         
         # Main container
         self.main_container = Frame(self.window, bg="#1a1a1a")
@@ -46,19 +70,24 @@ class CallUI:
     
     def _create_calling_ui(self):
         """UI khi đang gọi đi"""
-        # Video placeholder (if video call)
+        # Video canvas (if video call)
         if self.call_type == "video":
-            video_frame = Frame(self.main_container, bg="#000000", height=350)
-            video_frame.pack(fill="x", padx=20, pady=20)
-            video_frame.pack_propagate(False)
+            self.video_canvas = Canvas(
+                self.main_container, 
+                bg="#000000", 
+                width=640, 
+                height=480,
+                highlightthickness=0
+            )
+            self.video_canvas.pack(padx=20, pady=20)
             
-            Label(
-                video_frame,
-                text="📹",
-                font=("Arial", 80),
-                bg="#000000",
-                fg="#666666"
-            ).place(relx=0.5, rely=0.5, anchor=CENTER)
+            # Placeholder text
+            self.placeholder_text = self.video_canvas.create_text(
+                320, 240,
+                text="📹 Đang kết nối...",
+                font=("Arial", 24),
+                fill="#666666"
+            )
         
         # Status
         self.status_label = Label(
@@ -68,9 +97,9 @@ class CallUI:
             bg="#1a1a1a",
             fg="white"
         )
-        self.status_label.pack(pady=20)
+        self.status_label.pack(pady=10)
         
-        # Timer (hidden initially)
+        # Timer
         self.timer_label = Label(
             self.main_container,
             text="00:00",
@@ -121,8 +150,7 @@ class CallUI:
         buttons_frame = Frame(self.main_container, bg="#1a1a1a")
         buttons_frame.pack(pady=30)
         
-        # Reject button
-        reject_btn = Button(
+        Button(
             buttons_frame,
             text="❌",
             font=("Arial", 30),
@@ -133,11 +161,9 @@ class CallUI:
             bd=0,
             cursor="hand2",
             command=self._reject_call
-        )
-        reject_btn.pack(side="left", padx=20)
+        ).pack(side="left", padx=20)
         
-        # Accept button
-        accept_btn = Button(
+        Button(
             buttons_frame,
             text="✅",
             font=("Arial", 30),
@@ -148,15 +174,14 @@ class CallUI:
             bd=0,
             cursor="hand2",
             command=self._accept_call
-        )
-        accept_btn.pack(side="left", padx=20)
+        ).pack(side="left", padx=20)
     
     def _create_call_controls(self):
         """Tạo các nút điều khiển cuộc gọi"""
         controls_frame = Frame(self.main_container, bg="#1a1a1a")
-        controls_frame.pack(pady=20)
+        controls_frame.pack(pady=10)
         
-        # Mute button (if audio/video)
+        # Mute button
         self.mute_btn = Button(
             controls_frame,
             text="🎤",
@@ -203,7 +228,6 @@ class CallUI:
     
     def _accept_call(self):
         """Chấp nhận cuộc gọi"""
-        # Gửi ACCEPT về server
         Protocol.send_message(
             self.client.socket,
             MessageType.CALL_ACCEPT,
@@ -231,6 +255,7 @@ class CallUI:
             }
         )
         
+        self._cleanup_media()
         self.window.destroy()
         if self.client.current_call == self:
             self.client.current_call = None
@@ -246,12 +271,13 @@ class CallUI:
                 }
             )
         
+        self._cleanup_media()
         self.window.destroy()
         if self.client.current_call == self:
             self.client.current_call = None
     
     def _start_call_session(self):
-        """Bắt đầu phiên gọi"""
+        """Bắt đầu phiên gọi - Khởi động media"""
         self.call_active = True
         self.start_time = time.time()
         
@@ -261,6 +287,120 @@ class CallUI:
         # Show timer
         self.timer_label.pack(pady=5)
         self._update_timer()
+        
+        # Khởi động media streaming
+        if WEBRTC_AVAILABLE:
+            threading.Thread(target=self._start_media_streaming, daemon=True).start()
+        else:
+            self.status_label.config(
+                text="⚠️ WebRTC không khả dụng. Chỉ demo UI.",
+                fg="#ff9500"
+            )
+    
+    def _start_media_streaming(self):
+        """Khởi động video/audio streaming"""
+        try:
+            # Video streaming
+            if self.call_type == "video" and self.is_camera_on:
+                self._start_video_capture()
+            
+            # Audio streaming
+            self._start_audio_streaming()
+            
+        except Exception as e:
+            print(f"Error starting media: {e}")
+            self.window.after(0, lambda: self.status_label.config(
+                text=f"⚠️ Lỗi media: {e}",
+                fg="#ff3b30"
+            ))
+    
+    def _start_video_capture(self):
+        """Bắt đầu capture video từ webcam"""
+        try:
+            self.video_capture = cv2.VideoCapture(0)
+            
+            if not self.video_capture.isOpened():
+                raise Exception("Không thể mở webcam")
+            
+            # Set resolution
+            self.video_capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            self.video_capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+            
+            # Xóa placeholder
+            if hasattr(self, 'placeholder_text'):
+                self.video_canvas.delete(self.placeholder_text)
+            
+            # Bắt đầu video loop
+            self._update_video_frame()
+            
+        except Exception as e:
+            print(f"Video capture error: {e}")
+    
+    def _update_video_frame(self):
+        """Cập nhật frame video"""
+        if not self.call_active or not self.is_camera_on:
+            return
+        
+        try:
+            ret, frame = self.video_capture.read()
+            
+            if ret:
+                # Convert BGR to RGB
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                
+                # Mirror the frame
+                frame = cv2.flip(frame, 1)
+                
+                # Convert to PIL Image
+                image = Image.fromarray(frame)
+                photo = ImageTk.PhotoImage(image=image)
+                
+                # Update canvas
+                self.video_canvas.delete("all")
+                self.video_canvas.create_image(0, 0, image=photo, anchor="nw")
+                self.video_canvas.image = photo  # Keep reference
+                
+                # Schedule next update (30 FPS)
+                self.window.after(33, self._update_video_frame)
+        
+        except Exception as e:
+            print(f"Frame update error: {e}")
+    
+    def _start_audio_streaming(self):
+        """Bắt đầu audio streaming"""
+        try:
+            # PyAudio setup
+            p = pyaudio.PyAudio()
+            
+            # Input stream (microphone)
+            if not self.is_muted:
+                self.audio_stream = p.open(
+                    format=pyaudio.paInt16,
+                    channels=1,
+                    rate=44100,
+                    input=True,
+                    frames_per_buffer=1024,
+                    stream_callback=self._audio_callback
+                )
+                self.audio_stream.start_stream()
+            
+            # Output stream (speaker) - để nhận audio từ peer
+            self.audio_output = p.open(
+                format=pyaudio.paInt16,
+                channels=1,
+                rate=44100,
+                output=True,
+                frames_per_buffer=1024
+            )
+            
+        except Exception as e:
+            print(f"Audio streaming error: {e}")
+    
+    def _audio_callback(self, in_data, frame_count, time_info, status):
+        """Callback để xử lý audio data"""
+        # TODO: Gửi audio data qua socket đến peer
+        # Protocol.send_message(..., MessageType.AUDIO_DATA, {"data": in_data})
+        return (in_data, pyaudio.paContinue)
     
     def _update_timer(self):
         """Cập nhật bộ đếm thời gian"""
@@ -270,26 +410,60 @@ class CallUI:
             seconds = elapsed % 60
             self.timer_label.config(text=f"{minutes:02d}:{seconds:02d}")
             
-            # Update every second
             self.window.after(1000, self._update_timer)
     
     def _toggle_mute(self):
         """Bật/tắt mic"""
-        # Placeholder - tích hợp WebRTC sau
-        current_bg = self.mute_btn.cget("bg")
-        if current_bg == "#333333":
+        self.is_muted = not self.is_muted
+        
+        if self.is_muted:
             self.mute_btn.config(bg="#ff3b30", text="🔇")
+            if self.audio_stream:
+                self.audio_stream.stop_stream()
         else:
             self.mute_btn.config(bg="#333333", text="🎤")
+            if self.audio_stream:
+                self.audio_stream.start_stream()
     
     def _toggle_camera(self):
         """Bật/tắt camera"""
-        # Placeholder - tích hợp WebRTC sau
-        current_bg = self.camera_btn.cget("bg")
-        if current_bg == "#333333":
-            self.camera_btn.config(bg="#ff3b30", text="📵")
-        else:
+        self.is_camera_on = not self.is_camera_on
+        
+        if self.is_camera_on:
             self.camera_btn.config(bg="#333333", text="📹")
+            if not self.video_capture:
+                self._start_video_capture()
+        else:
+            self.camera_btn.config(bg="#ff3b30", text="📵")
+            if self.video_capture:
+                self.video_capture.release()
+                self.video_capture = None
+            
+            # Show camera off message
+            self.video_canvas.delete("all")
+            self.video_canvas.create_text(
+                320, 240,
+                text="📵 Camera tắt",
+                font=("Arial", 24),
+                fill="#666666"
+            )
+    
+    def _cleanup_media(self):
+        """Dọn dẹp media resources"""
+        self.call_active = False
+        
+        if self.video_capture:
+            self.video_capture.release()
+            self.video_capture = None
+        
+        if self.audio_stream:
+            self.audio_stream.stop_stream()
+            self.audio_stream.close()
+            self.audio_stream = None
+        
+        if self.audio_output:
+            self.audio_output.close()
+            self.audio_output = None
     
     def on_call_accepted(self):
         """Được gọi khi cuộc gọi được chấp nhận"""
@@ -298,7 +472,7 @@ class CallUI:
     def on_call_rejected(self):
         """Được gọi khi cuộc gọi bị từ chối"""
         self.status_label.config(text=f"{self.peer} đã từ chối cuộc gọi")
-        self.window.after(2000, self.window.destroy)
+        self.window.after(2000, lambda: (self._cleanup_media(), self.window.destroy()))
         if self.client.current_call == self:
             self.client.current_call = None
     
@@ -306,6 +480,6 @@ class CallUI:
         """Được gọi khi cuộc gọi kết thúc từ phía đối phương"""
         self.call_active = False
         self.status_label.config(text="Cuộc gọi đã kết thúc")
-        self.window.after(2000, self.window.destroy)
+        self.window.after(2000, lambda: (self._cleanup_media(), self.window.destroy()))
         if self.client.current_call == self:
             self.client.current_call = None

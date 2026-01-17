@@ -1,9 +1,9 @@
 """
-Giao diện chat chính - CẬP NHẬT với avatar clickable
+Giao diện chat chính - Chat riêng tích hợp trong cùng cửa sổ
 """
 
-from tkinter import Frame, Label, Button, Listbox, Text, Canvas, Scrollbar
-from tkinter import LEFT, RIGHT, BOTTOM, TOP, X, Y, BOTH, W, END, WORD, SOLID
+from tkinter import Frame, Label, Button, Text, Canvas, Scrollbar
+from tkinter import LEFT, RIGHT, BOTTOM, TOP, X, Y, BOTH, W, END, WORD
 from common.config import UISettings
 
 try:
@@ -17,6 +17,7 @@ class ChatUI:
     def __init__(self, client):
         self.client = client
         self.colors = client.colors
+        self.current_chat = None  # None = group chat, "username" = private chat
         
         # Main container
         self.main_container = Frame(self.client.root, bg=self.colors.BG_SECONDARY)
@@ -26,7 +27,7 @@ class ChatUI:
         self._create_chat_area()
     
     def _create_sidebar(self):
-        """Tạo sidebar với danh sách user - CẬP NHẬT với avatar clickable"""
+        """Tạo sidebar với danh sách user"""
         sidebar = Frame(self.main_container, bg=self.colors.BG_WHITE,
                        width=UISettings.SIDEBAR_WIDTH)
         sidebar.pack(side=LEFT, fill=Y)
@@ -46,6 +47,23 @@ class ChatUI:
             fg="white"
         ).pack(side=LEFT, padx=15, pady=15)
         
+        # Group chat button
+        group_btn_frame = Frame(sidebar, bg=self.colors.BG_WHITE)
+        group_btn_frame.pack(fill=X, pady=10, padx=10)
+        
+        self.group_chat_btn = Button(
+            group_btn_frame,
+            text="💬 Trò chuyện nhóm",
+            font=("Arial", 10, "bold"),
+            bg=self.colors.BG_PRIMARY,
+            fg="white",
+            bd=0,
+            cursor="hand2",
+            pady=10,
+            command=self._switch_to_group_chat
+        )
+        self.group_chat_btn.pack(fill=X)
+        
         # User list header
         Label(
             sidebar,
@@ -55,11 +73,10 @@ class ChatUI:
             fg=self.colors.TEXT_SECONDARY
         ).pack(pady=10, padx=15, anchor=W)
         
-        # User list container với Canvas để có thể custom
+        # User list container
         user_container = Frame(sidebar, bg=self.colors.BG_WHITE)
         user_container.pack(fill=BOTH, expand=True, padx=10, pady=5)
         
-        # Canvas và Scrollbar
         canvas = Canvas(user_container, bg=self.colors.BG_WHITE, 
                        highlightthickness=0)
         scrollbar = Scrollbar(user_container, command=canvas.yview)
@@ -100,26 +117,60 @@ class ChatUI:
     
     def _create_chat_header(self, parent):
         """Tạo header cho chat area"""
-        chat_header = Frame(parent, bg=self.colors.BG_WHITE,
-                           height=UISettings.CHAT_HEADER_HEIGHT)
-        chat_header.pack(fill=X)
-        chat_header.pack_propagate(False)
+        self.chat_header = Frame(parent, bg=self.colors.BG_WHITE,
+                                height=UISettings.CHAT_HEADER_HEIGHT)
+        self.chat_header.pack(fill=X)
+        self.chat_header.pack_propagate(False)
         
-        Label(
-            chat_header,
+        # Title (sẽ thay đổi theo chat mode)
+        self.chat_title = Label(
+            self.chat_header,
             text="💬 Trò chuyện nhóm",
             font=("Arial", 14, "bold"),
             bg=self.colors.BG_WHITE
-        ).pack(side=LEFT, padx=20, pady=15)
+        )
+        self.chat_title.pack(side=LEFT, padx=20, pady=15)
         
-        Frame(chat_header, height=1, bg="#E4E6EB").pack(side=BOTTOM, fill=X)
+        # Call buttons frame (ẩn khi ở group chat)
+        self.call_buttons_frame = Frame(self.chat_header, bg=self.colors.BG_WHITE)
+        self.call_buttons_frame.pack(side=RIGHT, padx=20)
+        
+        # Video call button
+        self.video_call_btn = Button(
+            self.call_buttons_frame,
+            text="📹",
+            font=("Arial", 18),
+            bg=self.colors.BG_WHITE,
+            fg=self.colors.BG_PRIMARY,
+            bd=0,
+            cursor="hand2",
+            command=lambda: self._start_call("video")
+        )
+        self.video_call_btn.pack(side=LEFT, padx=5)
+        
+        # Audio call button
+        self.audio_call_btn = Button(
+            self.call_buttons_frame,
+            text="📞",
+            font=("Arial", 18),
+            bg=self.colors.BG_WHITE,
+            fg=self.colors.BG_PRIMARY,
+            bd=0,
+            cursor="hand2",
+            command=lambda: self._start_call("audio")
+        )
+        self.audio_call_btn.pack(side=LEFT, padx=5)
+        
+        # Ẩn call buttons ban đầu
+        self.call_buttons_frame.pack_forget()
+        
+        Frame(self.chat_header, height=1, bg="#E4E6EB").pack(side=BOTTOM, fill=X)
     
     def _create_messages_area(self, parent):
         """Tạo khu vực hiển thị messages"""
         messages_frame = Frame(parent, bg=self.colors.BG_SECONDARY)
         messages_frame.pack(fill=BOTH, expand=True, padx=15, pady=10)
         
-        # Canvas + Scrollbar
         msg_canvas = Canvas(messages_frame, bg=self.colors.BG_SECONDARY,
                            highlightthickness=0)
         msg_scrollbar = Scrollbar(messages_frame, command=msg_canvas.yview)
@@ -195,7 +246,7 @@ class ChatUI:
         self.message_entry.bind("<Shift-Return>", lambda e: None)
     
     def _create_action_buttons(self, parent):
-        """Tạo các nút hành động (gửi file, ảnh, video)"""
+        """Tạo các nút hành động"""
         buttons_frame = Frame(parent, bg=self.colors.BG_WHITE)
         buttons_frame.pack(side=LEFT, padx=(0, 10))
         
@@ -234,81 +285,83 @@ class ChatUI:
             ).pack(side=LEFT, padx=2)
     
     def _handle_send_text(self):
-        """Xử lý gửi tin nhắn text"""
+        """Xử lý gửi tin nhắn"""
         message = self.message_entry.get("1.0", END).strip()
         
         if not message:
             return
         
-        if self.client.send_text_message(message):
-            # Hiển thị tin nhắn của mình
+        # Gửi với hoặc không recipient tùy mode
+        if self.client.send_text_message(message, self.current_chat):
             from datetime import datetime
-            self.client.message_handler.display_text_message({
+            self.client.message_handler.display_message_in_current_view({
                 "sender": self.client.username,
+                "recipient": self.current_chat,
                 "message": message,
                 "timestamp": datetime.now().isoformat()
             })
             
-            # Clear input
             self.message_entry.delete("1.0", END)
     
     def update_user_list(self, users):
         """Cập nhật danh sách user với avatar clickable"""
-        # Xóa tất cả widgets cũ
         for widget in self.user_list_frame.winfo_children():
             widget.destroy()
         
-        # Tạo lại danh sách user
         for user in users:
             if user == self.client.username:
-                continue  # Không hiển thị bản thân
+                continue
             
             self._create_user_item(user)
     
     def _create_user_item(self, username):
         """Tạo item user với avatar clickable"""
-        user_frame = Frame(self.user_list_frame, bg=self.colors.BG_WHITE,
-                          cursor="hand2")
+        # Kiểm tra xem đang chat với user này không
+        is_active = (self.current_chat == username)
+        
+        user_frame = Frame(
+            self.user_list_frame, 
+            bg=self.colors.BG_SECONDARY if is_active else self.colors.BG_WHITE,
+            cursor="hand2"
+        )
         user_frame.pack(fill=X, pady=3, padx=5)
         
-        # Hover effect
         def on_enter(e):
-            user_frame.config(bg=self.colors.BG_SECONDARY)
-            for child in user_frame.winfo_children():
-                if isinstance(child, (Label, Frame)):
-                    child.config(bg=self.colors.BG_SECONDARY)
+            if not is_active:
+                user_frame.config(bg=self.colors.BG_SECONDARY)
+                for child in user_frame.winfo_children():
+                    if isinstance(child, (Label, Frame)):
+                        child.config(bg=self.colors.BG_SECONDARY)
         
         def on_leave(e):
-            user_frame.config(bg=self.colors.BG_WHITE)
-            for child in user_frame.winfo_children():
-                if isinstance(child, (Label, Frame)):
-                    child.config(bg=self.colors.BG_WHITE)
+            if not is_active:
+                user_frame.config(bg=self.colors.BG_WHITE)
+                for child in user_frame.winfo_children():
+                    if isinstance(child, (Label, Frame)):
+                        child.config(bg=self.colors.BG_WHITE)
         
         def on_click(e):
-            self._open_private_chat(username)
+            self._switch_to_private_chat(username)
         
         user_frame.bind("<Enter>", on_enter)
         user_frame.bind("<Leave>", on_leave)
         user_frame.bind("<Button-1>", on_click)
         
-        # Container cho avatar và tên
-        content_frame = Frame(user_frame, bg=self.colors.BG_WHITE)
+        content_frame = Frame(user_frame, bg=user_frame.cget("bg"))
         content_frame.pack(fill=X, padx=10, pady=8)
         content_frame.bind("<Button-1>", on_click)
         
-        # Avatar
         avatar_label = Label(
             content_frame,
             text="👤",
             font=("Arial", 20),
-            bg=self.colors.BG_WHITE,
+            bg=content_frame.cget("bg"),
             fg=self.colors.BG_PRIMARY
         )
         avatar_label.pack(side=LEFT, padx=(0, 10))
         avatar_label.bind("<Button-1>", on_click)
         
-        # Username và status
-        info_frame = Frame(content_frame, bg=self.colors.BG_WHITE)
+        info_frame = Frame(content_frame, bg=content_frame.cget("bg"))
         info_frame.pack(side=LEFT, fill=X, expand=True)
         info_frame.bind("<Button-1>", on_click)
         
@@ -316,7 +369,7 @@ class ChatUI:
             info_frame,
             text=username,
             font=("Arial", 11, "bold"),
-            bg=self.colors.BG_WHITE,
+            bg=info_frame.cget("bg"),
             fg=self.colors.TEXT_PRIMARY,
             anchor=W
         )
@@ -327,22 +380,80 @@ class ChatUI:
             info_frame,
             text="🟢 Online",
             font=("Arial", 8),
-            bg=self.colors.BG_WHITE,
+            bg=info_frame.cget("bg"),
             fg="green",
             anchor=W
         )
         status_label.pack(fill=X)
         status_label.bind("<Button-1>", on_click)
     
-    def _open_private_chat(self, username):
-        """Mở cửa sổ chat riêng với user"""
-        # Kiểm tra xem đã mở chưa
-        if username in self.client.private_chats:
-            # Focus vào cửa sổ đã mở
-            self.client.private_chats[username].window.lift()
-            self.client.private_chats[username].window.focus_force()
-        else:
-            # Tạo cửa sổ chat mới
-            from client.ui.private_chat_ui import PrivateChatUI
-            private_chat = PrivateChatUI(self.client, username)
-            self.client.private_chats[username] = private_chat
+    def _switch_to_group_chat(self):
+        """Chuyển sang chế độ chat nhóm"""
+        self.current_chat = None
+        self.chat_title.config(text="💬 Trò chuyện nhóm")
+        self.call_buttons_frame.pack_forget()
+        
+        # Clear messages và load lại group messages
+        self._clear_messages()
+        self._load_group_messages()
+        
+        # Update user list để bỏ highlight
+        self.update_user_list(self.client.users)
+        
+        # Update group chat button
+        self.group_chat_btn.config(bg=self.colors.BG_PRIMARY)
+    
+    def _switch_to_private_chat(self, username):
+        """Chuyển sang chế độ chat riêng"""
+        self.current_chat = username
+        self.chat_title.config(text=f"💬 Chat với {username}")
+        self.call_buttons_frame.pack(side=RIGHT, padx=20)
+        
+        # Clear messages và load lại private messages
+        self._clear_messages()
+        self._load_private_messages(username)
+        
+        # Update user list để highlight user đang chat
+        self.update_user_list(self.client.users)
+        
+        # Update group chat button
+        self.group_chat_btn.config(bg=self.colors.BG_WHITE)
+    
+    def _clear_messages(self):
+        """Xóa tất cả messages hiện tại"""
+        for widget in self.messages_container.winfo_children():
+            widget.destroy()
+    
+    def _load_group_messages(self):
+        """Load lại messages của group chat"""
+        for msg in self.client.messages:
+            if not msg.get("recipient"):  # Chỉ load tin nhắn không có recipient
+                self.client.message_handler.display_message_in_current_view(msg)
+    
+    def _load_private_messages(self, username):
+        """Load lại messages với user cụ thể"""
+        for msg in self.client.messages:
+            sender = msg.get("sender")
+            recipient = msg.get("recipient")
+            
+            # Hiển thị nếu tin nhắn giữa mình và user
+            if (sender == username and recipient == self.client.username) or \
+               (sender == self.client.username and recipient == username):
+                self.client.message_handler.display_message_in_current_view(msg)
+    
+    def _start_call(self, call_type):
+        """Bắt đầu cuộc gọi"""
+        if self.current_chat:
+            from client.ui.call_ui import CallUI
+            call_ui = CallUI(self.client, self.current_chat, call_type, is_caller=True)
+            
+            from common.protocol import Protocol, MessageType
+            Protocol.send_message(
+                self.client.socket,
+                MessageType.CALL_REQUEST,
+                {
+                    "recipient": self.current_chat,
+                    "call_type": call_type,
+                    "caller": self.client.username
+                }
+            )

@@ -1,5 +1,5 @@
 """
-Core logic cho Chat Client - CẬP NHẬT với private chat và call
+Core logic cho Chat Client - Lưu messages history
 """
 
 import socket
@@ -34,14 +34,11 @@ class ChatClient:
         self.upload_permission = False
         self.current_download_ui = None
         
-        # Data
+        # Data - LƯU TẤT CẢ MESSAGES
         self.users = []
-        self.messages = []
+        self.messages = []  # Lưu tất cả messages (group + private)
         
-        # Private chats - NEW
-        self.private_chats = {}  # {username: PrivateChatUI}
-        
-        # Current call - NEW
+        # Current call
         self.current_call = None
         
         # Thư mục lưu file
@@ -51,14 +48,14 @@ class ChatClient:
         # Colors
         self.colors = Colors
         
-        # UI Components (sẽ được khởi tạo sau)
+        # UI Components
         self.login_ui = None
         self.chat_ui = None
         
         # Handlers
         self.message_handler = MessageHandler(self)
         self.file_handler = FileHandler(self)
-        self.call_handler = CallHandler(self)  # NEW
+        self.call_handler = CallHandler(self)
         
         # Setup initial UI
         self.setup_login_ui()
@@ -172,6 +169,10 @@ class ChatClient:
         except Exception as e:
             self.message_handler.show_system_message(f"❌ Lỗi gửi tin nhắn: {e}")
             return False
+    
+    def add_message(self, msg_data):
+        """Thêm message vào history"""
+        self.messages.append(msg_data)
     
     def on_closing(self):
         """Xử lý khi đóng app"""
