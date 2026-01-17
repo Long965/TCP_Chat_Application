@@ -1,8 +1,9 @@
 """
-Xử lý connection từng client
+Xử lý connection từng client - CẬP NHẬT
+Server/handlers/client_handler.py
 """
-from datetime import datetime
 
+from datetime import datetime
 from common.protocol import Protocol, MessageType
 from server.handlers.message_handler import MessageHandler
 from server.handlers.file_handler import FileHandler
@@ -36,23 +37,84 @@ class ClientHandler:
                 # Xử lý TEXT message
                 elif msg_type == MessageType.TEXT:
                     self.message_handler.handle_text_message(
-                        self.client_socket, 
-                        self.username, 
+                        self.client_socket,
+                        self.username,
                         data
                     )
                 
                 # Xử lý FILE UPLOAD
                 elif msg_type == MessageType.FILE_UPLOAD:
                     self.file_handler.handle_file_upload(
-                        self.client_socket, 
-                        self.username, 
+                        self.client_socket,
+                        self.username,
                         data
                     )
                 
                 # Xử lý FILE DOWNLOAD
                 elif msg_type == MessageType.FILE_DOWNLOAD:
                     self.file_handler.handle_file_download(
-                        self.client_socket, 
+                        self.client_socket,
+                        data
+                    )
+                
+                # Xử lý CALL - NEW
+                elif msg_type == MessageType.CALL_REQUEST:
+                    self.message_handler.handle_call_request(
+                        self.client_socket,
+                        self.username,
+                        data
+                    )
+                
+                elif msg_type == MessageType.CALL_ACCEPT:
+                    self.message_handler.handle_call_accept(
+                        self.client_socket,
+                        self.username,
+                        data
+                    )
+                
+                elif msg_type == MessageType.CALL_REJECT:
+                    self.message_handler.handle_call_reject(
+                        self.client_socket,
+                        self.username,
+                        data
+                    )
+                
+                elif msg_type == MessageType.CALL_BUSY:
+                    self.message_handler.handle_call_busy(
+                        self.client_socket,
+                        self.username,
+                        data
+                    )
+                
+                elif msg_type == MessageType.CALL_END:
+                    self.message_handler.handle_call_end(
+                        self.client_socket,
+                        self.username,
+                        data
+                    )
+                
+                # Xử lý WebRTC signaling - NEW
+                elif msg_type == MessageType.WEBRTC_OFFER:
+                    self.message_handler.handle_webrtc_signal(
+                        self.client_socket,
+                        self.username,
+                        MessageType.WEBRTC_OFFER,
+                        data
+                    )
+                
+                elif msg_type == MessageType.WEBRTC_ANSWER:
+                    self.message_handler.handle_webrtc_signal(
+                        self.client_socket,
+                        self.username,
+                        MessageType.WEBRTC_ANSWER,
+                        data
+                    )
+                
+                elif msg_type == MessageType.WEBRTC_ICE:
+                    self.message_handler.handle_webrtc_signal(
+                        self.client_socket,
+                        self.username,
+                        MessageType.WEBRTC_ICE,
                         data
                     )
                 

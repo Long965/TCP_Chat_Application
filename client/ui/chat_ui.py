@@ -1,9 +1,9 @@
 """
-Giao diện chat chính
+Giao diện chat chính - CẬP NHẬT với avatar clickable
 """
+
 from tkinter import Frame, Label, Button, Listbox, Text, Canvas, Scrollbar
 from tkinter import LEFT, RIGHT, BOTTOM, TOP, X, Y, BOTH, W, END, WORD, SOLID
-
 from common.config import UISettings
 
 try:
@@ -26,14 +26,14 @@ class ChatUI:
         self._create_chat_area()
     
     def _create_sidebar(self):
-        """Tạo sidebar với danh sách user"""
-        sidebar = Frame(self.main_container, bg=self.colors.BG_WHITE, 
+        """Tạo sidebar với danh sách user - CẬP NHẬT với avatar clickable"""
+        sidebar = Frame(self.main_container, bg=self.colors.BG_WHITE,
                        width=UISettings.SIDEBAR_WIDTH)
         sidebar.pack(side=LEFT, fill=Y)
         sidebar.pack_propagate(False)
         
         # Sidebar header
-        sidebar_header = Frame(sidebar, bg=self.colors.BG_PRIMARY, 
+        sidebar_header = Frame(sidebar, bg=self.colors.BG_PRIMARY,
                               height=UISettings.CHAT_HEADER_HEIGHT)
         sidebar_header.pack(fill=X)
         sidebar_header.pack_propagate(False)
@@ -55,25 +55,34 @@ class ChatUI:
             fg=self.colors.TEXT_SECONDARY
         ).pack(pady=10, padx=15, anchor=W)
         
-        # User listbox
-        user_frame = Frame(sidebar, bg=self.colors.BG_WHITE)
-        user_frame.pack(fill=BOTH, expand=True, padx=10)
+        # User list container với Canvas để có thể custom
+        user_container = Frame(sidebar, bg=self.colors.BG_WHITE)
+        user_container.pack(fill=BOTH, expand=True, padx=10, pady=5)
         
-        scrollbar = Scrollbar(user_frame)
+        # Canvas và Scrollbar
+        canvas = Canvas(user_container, bg=self.colors.BG_WHITE, 
+                       highlightthickness=0)
+        scrollbar = Scrollbar(user_container, command=canvas.yview)
+        
+        self.user_list_frame = Frame(canvas, bg=self.colors.BG_WHITE)
+        
         scrollbar.pack(side=RIGHT, fill=Y)
+        canvas.pack(side=LEFT, fill=BOTH, expand=True)
+        canvas.configure(yscrollcommand=scrollbar.set)
         
-        self.user_listbox = Listbox(
-            user_frame,
-            font=UISettings.FONT_MESSAGE,
-            bg=self.colors.BG_WHITE,
-            fg=self.colors.TEXT_PRIMARY,
-            bd=0,
-            highlightthickness=0,
-            selectbackground=self.colors.BG_SECONDARY,
-            yscrollcommand=scrollbar.set
+        canvas_window = canvas.create_window(
+            (0, 0),
+            window=self.user_list_frame,
+            anchor="nw"
         )
-        self.user_listbox.pack(side=LEFT, fill=BOTH, expand=True)
-        scrollbar.config(command=self.user_listbox.yview)
+        
+        def configure_scroll(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            canvas.itemconfig(canvas_window, width=event.width)
+        
+        self.user_list_frame.bind("<Configure>", configure_scroll)
+        canvas.bind("<Configure>", 
+                   lambda e: canvas.itemconfig(canvas_window, width=e.width))
     
     def _create_chat_area(self):
         """Tạo khu vực chat"""
@@ -91,7 +100,7 @@ class ChatUI:
     
     def _create_chat_header(self, parent):
         """Tạo header cho chat area"""
-        chat_header = Frame(parent, bg=self.colors.BG_WHITE, 
+        chat_header = Frame(parent, bg=self.colors.BG_WHITE,
                            height=UISettings.CHAT_HEADER_HEIGHT)
         chat_header.pack(fill=X)
         chat_header.pack_propagate(False)
@@ -111,7 +120,7 @@ class ChatUI:
         messages_frame.pack(fill=BOTH, expand=True, padx=15, pady=10)
         
         # Canvas + Scrollbar
-        msg_canvas = Canvas(messages_frame, bg=self.colors.BG_SECONDARY, 
+        msg_canvas = Canvas(messages_frame, bg=self.colors.BG_SECONDARY,
                            highlightthickness=0)
         msg_scrollbar = Scrollbar(messages_frame, command=msg_canvas.yview)
         
@@ -133,12 +142,12 @@ class ChatUI:
             msg_canvas.yview_moveto(1.0)
         
         self.messages_container.bind("<Configure>", configure_scroll)
-        msg_canvas.bind("<Configure>", 
+        msg_canvas.bind("<Configure>",
                        lambda e: msg_canvas.itemconfig(canvas_frame, width=e.width))
     
     def _create_input_area(self, parent):
         """Tạo khu vực nhập tin nhắn"""
-        input_container = Frame(parent, bg=self.colors.BG_WHITE, 
+        input_container = Frame(parent, bg=self.colors.BG_WHITE,
                                height=UISettings.INPUT_AREA_HEIGHT)
         input_container.pack(fill=X, side=BOTTOM)
         input_container.pack_propagate(False)
@@ -181,7 +190,7 @@ class ChatUI:
         self.send_btn.pack(side=RIGHT)
         
         # Bind Enter
-        self.message_entry.bind("<Return>", 
+        self.message_entry.bind("<Return>",
                                lambda e: self._handle_send_text() or "break")
         self.message_entry.bind("<Shift-Return>", lambda e: None)
     
@@ -244,9 +253,96 @@ class ChatUI:
             self.message_entry.delete("1.0", END)
     
     def update_user_list(self, users):
-        """Cập nhật danh sách user"""
-        self.user_listbox.delete(0, END)
+        """Cập nhật danh sách user với avatar clickable"""
+        # Xóa tất cả widgets cũ
+        for widget in self.user_list_frame.winfo_children():
+            widget.destroy()
         
+        # Tạo lại danh sách user
         for user in users:
-            display = f"🟢 {user}" if user == self.client.username else f"👤 {user}"
-            self.user_listbox.insert(END, display)
+            if user == self.client.username:
+                continue  # Không hiển thị bản thân
+            
+            self._create_user_item(user)
+    
+    def _create_user_item(self, username):
+        """Tạo item user với avatar clickable"""
+        user_frame = Frame(self.user_list_frame, bg=self.colors.BG_WHITE,
+                          cursor="hand2")
+        user_frame.pack(fill=X, pady=3, padx=5)
+        
+        # Hover effect
+        def on_enter(e):
+            user_frame.config(bg=self.colors.BG_SECONDARY)
+            for child in user_frame.winfo_children():
+                if isinstance(child, (Label, Frame)):
+                    child.config(bg=self.colors.BG_SECONDARY)
+        
+        def on_leave(e):
+            user_frame.config(bg=self.colors.BG_WHITE)
+            for child in user_frame.winfo_children():
+                if isinstance(child, (Label, Frame)):
+                    child.config(bg=self.colors.BG_WHITE)
+        
+        def on_click(e):
+            self._open_private_chat(username)
+        
+        user_frame.bind("<Enter>", on_enter)
+        user_frame.bind("<Leave>", on_leave)
+        user_frame.bind("<Button-1>", on_click)
+        
+        # Container cho avatar và tên
+        content_frame = Frame(user_frame, bg=self.colors.BG_WHITE)
+        content_frame.pack(fill=X, padx=10, pady=8)
+        content_frame.bind("<Button-1>", on_click)
+        
+        # Avatar
+        avatar_label = Label(
+            content_frame,
+            text="👤",
+            font=("Arial", 20),
+            bg=self.colors.BG_WHITE,
+            fg=self.colors.BG_PRIMARY
+        )
+        avatar_label.pack(side=LEFT, padx=(0, 10))
+        avatar_label.bind("<Button-1>", on_click)
+        
+        # Username và status
+        info_frame = Frame(content_frame, bg=self.colors.BG_WHITE)
+        info_frame.pack(side=LEFT, fill=X, expand=True)
+        info_frame.bind("<Button-1>", on_click)
+        
+        username_label = Label(
+            info_frame,
+            text=username,
+            font=("Arial", 11, "bold"),
+            bg=self.colors.BG_WHITE,
+            fg=self.colors.TEXT_PRIMARY,
+            anchor=W
+        )
+        username_label.pack(fill=X)
+        username_label.bind("<Button-1>", on_click)
+        
+        status_label = Label(
+            info_frame,
+            text="🟢 Online",
+            font=("Arial", 8),
+            bg=self.colors.BG_WHITE,
+            fg="green",
+            anchor=W
+        )
+        status_label.pack(fill=X)
+        status_label.bind("<Button-1>", on_click)
+    
+    def _open_private_chat(self, username):
+        """Mở cửa sổ chat riêng với user"""
+        # Kiểm tra xem đã mở chưa
+        if username in self.client.private_chats:
+            # Focus vào cửa sổ đã mở
+            self.client.private_chats[username].window.lift()
+            self.client.private_chats[username].window.focus_force()
+        else:
+            # Tạo cửa sổ chat mới
+            from client.ui.private_chat_ui import PrivateChatUI
+            private_chat = PrivateChatUI(self.client, username)
+            self.client.private_chats[username] = private_chat

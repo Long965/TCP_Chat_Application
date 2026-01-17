@@ -1,6 +1,7 @@
 """
 Protocol cho ứng dụng chat - Định nghĩa cấu trúc message
 """
+
 import json
 import struct
 
@@ -10,10 +11,11 @@ class MessageType:
     LOGIN = "LOGIN"
     LOGIN_SUCCESS = "LOGIN_SUCCESS"
     LOGIN_FAILED = "LOGIN_FAILED"
-   
+    
     # Text messages
     TEXT = "TEXT"
-   
+    PRIVATE_TEXT = "PRIVATE_TEXT"  # NEW: Tin nhắn riêng tư
+    
     # File transfer
     FILE_UPLOAD = "FILE_UPLOAD"
     FILE_DOWNLOAD = "FILE_DOWNLOAD"
@@ -21,12 +23,25 @@ class MessageType:
     FILE_CHUNK = "FILE_CHUNK"
     FILE_COMPLETE = "FILE_COMPLETE"
     FILE_ERROR = "FILE_ERROR"
-   
+    
     # User management
     USER_LIST = "USER_LIST"
     USER_ONLINE = "USER_ONLINE"
     USER_OFFLINE = "USER_OFFLINE"
-   
+    USER_INFO = "USER_INFO"  # NEW: Thông tin user
+    
+    # Video/Audio Call - NEW
+    CALL_REQUEST = "CALL_REQUEST"           # Yêu cầu gọi
+    CALL_ACCEPT = "CALL_ACCEPT"             # Chấp nhận cuộc gọi
+    CALL_REJECT = "CALL_REJECT"             # Từ chối cuộc gọi
+    CALL_END = "CALL_END"                   # Kết thúc cuộc gọi
+    CALL_BUSY = "CALL_BUSY"                 # Đang bận
+    
+    # WebRTC Signaling
+    WEBRTC_OFFER = "WEBRTC_OFFER"           # SDP Offer
+    WEBRTC_ANSWER = "WEBRTC_ANSWER"         # SDP Answer
+    WEBRTC_ICE = "WEBRTC_ICE"               # ICE Candidate
+    
     # System
     PING = "PING"
     PONG = "PONG"
@@ -34,10 +49,10 @@ class MessageType:
 
 class Protocol:
     """Xử lý encode/decode message"""
-   
+    
     HEADER_SIZE = 4  # 4 bytes cho message length
     ENCODING = "utf-8"
-   
+    
     @staticmethod
     def encode_message(msg_type, data):
         """
@@ -48,16 +63,16 @@ class Protocol:
             "type": msg_type,
             "data": data
         }
-       
+        
         json_str = json.dumps(message, ensure_ascii=False)
         json_bytes = json_str.encode(Protocol.ENCODING)
-       
+        
         # Thêm header chứa độ dài message
         length = len(json_bytes)
         header = struct.pack(">I", length)  # Big-endian unsigned int
-       
+        
         return header + json_bytes
-   
+    
     @staticmethod
     def decode_message(data):
         """
@@ -70,7 +85,7 @@ class Protocol:
             return message["type"], message["data"]
         except Exception as e:
             return MessageType.ERROR, str(e)
-   
+    
     @staticmethod
     def recv_message(sock):
         """
@@ -82,22 +97,22 @@ class Protocol:
             header = Protocol._recv_exact(sock, Protocol.HEADER_SIZE)
             if not header:
                 return None, None
-           
+            
             # Giải mã độ dài message
             msg_length = struct.unpack(">I", header)[0]
-           
+            
             # Đọc message data
             msg_data = Protocol._recv_exact(sock, msg_length)
             if not msg_data:
                 return None, None
-           
+            
             # Decode message
             return Protocol.decode_message(msg_data)
-           
+            
         except Exception as e:
             print(f"Error receiving message: {e}")
             return None, None
-   
+    
     @staticmethod
     def _recv_exact(sock, n):
         """Nhận chính xác n bytes từ socket"""
@@ -108,7 +123,7 @@ class Protocol:
                 return None
             data.extend(packet)
         return bytes(data)
-   
+    
     @staticmethod
     def send_message(sock, msg_type, data):
         """Gửi message qua socket"""
