@@ -1,5 +1,5 @@
 """
-Protocol cho ứng dụng chat - Định nghĩa cấu trúc message (FULL)
+Protocol cho ứng dụng chat - Định nghĩa cấu trúc message (FULL FIXED)
 """
 
 import json
@@ -16,25 +16,28 @@ class MessageType:
     TEXT = "TEXT"
     PRIVATE_TEXT = "PRIVATE_TEXT"
     
-    # File transfer (Đã bổ sung đầy đủ)
+    # File transfer
     FILE_UPLOAD = "FILE_UPLOAD"
     FILE_DOWNLOAD = "FILE_DOWNLOAD"
     FILE_INFO = "FILE_INFO"
     FILE_DATA = "FILE_DATA"
     FILE_CHUNK = "FILE_CHUNK"      
-    FILE_COMPLETE = "FILE_COMPLETE" # <--- Đã thêm biến này để sửa lỗi
-    FILE_ERROR = "FILE_ERROR"       # <--- Thêm luôn biến này cho chắc
+    FILE_COMPLETE = "FILE_COMPLETE"
+    FILE_ERROR = "FILE_ERROR"
     
     # User management
     LIST_USERS = "LIST_USERS"
     USER_INFO = "USER_INFO"
     
-    # Video/Audio Call
+    # Video/Audio Call & WebRTC
     CALL_REQUEST = "CALL_REQUEST"
     CALL_ACCEPT = "CALL_ACCEPT"
     CALL_REJECT = "CALL_REJECT"
     CALL_END = "CALL_END"
     CALL_BUSY = "CALL_BUSY"
+    
+    # [QUAN TRỌNG] Thêm dòng này để sửa lỗi AttributeError
+    CALL_ICE_CANDIDATE = "CALL_ICE_CANDIDATE" 
     
     # Media Data
     VIDEO_DATA = "VIDEO_DATA"
@@ -91,6 +94,7 @@ class Protocol:
         Nhận message hoàn chỉnh từ socket
         Returns: (msg_type, data) hoặc (None, None) nếu disconnect
         """
+        if not sock: return None, None
         try:
             # Đọc header (4 bytes)
             header = Protocol._recv_exact(sock, Protocol.HEADER_SIZE)
@@ -128,6 +132,7 @@ class Protocol:
     @staticmethod
     def send_message(sock, msg_type, data):
         """Gửi message qua socket"""
+        if not sock: return False
         try:
             message = Protocol.encode_message(msg_type, data)
             sock.sendall(message)
@@ -135,3 +140,14 @@ class Protocol:
         except Exception as e:
             print(f"Error sending message: {e}")
             return False
+    
+    # Helper cho Base64 (nếu cần dùng cho file cũ)
+    @staticmethod
+    def encode_base64(data_bytes):
+        import base64
+        return base64.b64encode(data_bytes).decode('utf-8')
+
+    @staticmethod
+    def decode_base64(data_str):
+        import base64
+        return base64.b64decode(data_str.encode('utf-8'))

@@ -10,7 +10,7 @@
     --text-primary: #f5f5f5;    /* Chữ chính (Trắng) */
     --text-secondary: #7f91a4;  /* Chữ phụ (Xám xanh) */
     --accent: #5288c1;          /* Màu xanh Telegram (Icon, Link) */
-    
+
     --msg-out-bg: #2b5278;      /* Tin nhắn gửi đi (Xanh) */
     --msg-in-bg: #182533;       /* Tin nhắn nhận (Xám tối) */
     
@@ -39,19 +39,23 @@ body {
     background: var(--bg-main);
     z-index: 9999;
 }
+
 .login-box {
     background: var(--bg-sidebar);
     padding: 40px; width: 320px;
     border-radius: 10px; text-align: center;
     box-shadow: 0 10px 20px rgba(0,0,0,0.3);
 }
+
 .login-box h2 { color: var(--text-primary); margin-bottom: 5px; }
 .login-box p { color: var(--text-secondary); font-size: 14px; margin-bottom: 20px; }
+
 .login-box input {
     width: 100%; padding: 12px; margin-bottom: 15px;
     background: var(--bg-main); border: 1px solid #303841;
     color: white; border-radius: 6px;
 }
+
 .login-box button {
     width: 100%; padding: 12px;
     background: var(--accent); color: white; border: none;
@@ -73,16 +77,17 @@ body {
     padding: 10px 15px;
     display: flex; align-items: center; gap: 10px;
 }
-.menu-btn { background: none; border: none; color: var(--text-secondary); font-size: 20px; cursor: pointer; }
 
 .search-box {
     flex: 1; position: relative;
 }
+
 .search-box input {
     width: 100%; padding: 8px 15px 8px 35px;
     background: #242f3d; border: none; border-radius: 20px;
     color: var(--text-primary); font-size: 14px;
 }
+
 .search-icon {
     position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
     color: var(--text-secondary); font-size: 14px;
@@ -91,7 +96,7 @@ body {
 #user-list {
     flex: 1; overflow-y: auto; list-style: none; padding: 0; margin: 0;
 }
-/* Scrollbar custom */
+
 #user-list::-webkit-scrollbar { width: 5px; }
 #user-list::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 3px; }
 
@@ -99,6 +104,7 @@ body {
     display: flex; align-items: center; padding: 10px 15px;
     cursor: pointer; transition: background 0.2s;
 }
+
 .user-item:hover { background: var(--bg-hover); }
 .user-item.active { background: var(--active-item); }
 
@@ -109,31 +115,31 @@ body {
     display: flex; justify-content: center; align-items: center;
     margin-right: 12px; flex-shrink: 0;
 }
-.group-avatar { background: linear-gradient(135deg, #ff9a9e, #fecfef); }
 
 .user-info { flex: 1; overflow: hidden; }
-.user-top { display: flex; justify-content: space-between; margin-bottom: 3px; }
 .user-name { font-weight: 600; font-size: 15px; color: var(--text-primary); }
-.user-time { font-size: 12px; color: var(--text-secondary); }
 .user-preview { font-size: 14px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.active .user-preview, .active .user-time { color: #dceaf5; }
+.active .user-preview { color: #dceaf5; }
 
 /* --- CHAT AREA --- */
 .main-chat {
     flex: 1; display: flex; flex-direction: column;
     background-color: var(--bg-main);
-    /* Hình nền tối giống Telegram */
-    background-image: url('https://web.telegram.org/img/bg_0_dark.png');
-    background-size: cover;
+    flex: 1; display: flex; flex-direction: column;
+    background-color: var(--bg-main);
+    /* Dùng pattern CSS nhẹ thay vì ảnh lỗi */
+    background-image: radial-gradient(#1e2c3a 1px, transparent 1px);
+    background-size: 20px 20px;
+    position: relative;
     position: relative;
 }
 
-/* Chat Header */
 .chat-header {
     height: 60px; background: var(--bg-sidebar);
     padding: 0 20px; display: flex; align-items: center; justify-content: space-between;
     border-bottom: 1px solid black; cursor: pointer;
 }
+
 .header-info h3 { margin: 0; font-size: 16px; color: var(--text-primary); }
 .header-info p { margin: 2px 0 0; font-size: 13px; color: var(--text-secondary); }
 
@@ -148,6 +154,7 @@ body {
     flex: 1; padding: 10px 20px; overflow-y: auto;
     display: flex; flex-direction: column; gap: 5px;
 }
+
 .messages-area::-webkit-scrollbar { width: 6px; }
 .messages-area::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.3); border-radius: 3px; }
 
@@ -163,6 +170,7 @@ body {
     box-shadow: 0 1px 2px rgba(0,0,0,0.3);
     min-width: 80px;
 }
+
 .sent .bubble { background: var(--msg-out-bg); color: white; border-bottom-right-radius: 2px; }
 .received .bubble { background: var(--msg-in-bg); color: white; border-bottom-left-radius: 2px; }
 
@@ -170,13 +178,13 @@ body {
     font-size: 12px; font-weight: bold; color: var(--accent);
     margin-bottom: 4px; display: none; cursor: pointer;
 }
-.received .sender-name { display: block; } /* Chỉ hiện tên người khác */
+.received .sender-name { display: block; }
 
 .msg-time {
     font-size: 11px; color: #8faec5; text-align: right;
     margin-top: 2px; float: right; margin-left: 10px; padding-top: 5px;
 }
-.sent .msg-time { color: #84b3d9; } /* Màu giờ tin nhắn gửi đi sáng hơn chút */
+.sent .msg-time { color: #84b3d9; }
 
 /* File Attachment */
 .file-attachment {
@@ -191,6 +199,7 @@ body {
     padding: 10px 20px; background: var(--bg-sidebar);
     display: flex; align-items: center; gap: 15px;
 }
+
 .attach-btn {
     background: none; border: none; color: var(--text-secondary);
     font-size: 24px; cursor: pointer; transform: rotate(45deg);

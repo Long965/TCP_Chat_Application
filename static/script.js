@@ -1,39 +1,34 @@
 /**
- * static/script.js - Phiên bản đồng bộ với HTML id="app"
+ * static/script.js - Logic Web Client (Full + Upload Speed Limit)
  */
-
 let ws;
 let username = "";
 let currentChat = null; // null = Chat nhóm
-let messages = [];      // Lưu trữ tin nhắn
+let messages = [];      // Lưu trữ lịch sử tin nhắn
+
+// --- CẤU HÌNH UPLOAD ---
+const UPLOAD_SPEED_LIMIT = 512 * 1024; // 512 KB/s (Giới hạn tốc độ)
+const CHUNK_SIZE = 8192; // 8KB mỗi gói
+let isUploading = false;
+let uploadCancelled = false;
 
 // --- 1. KẾT NỐI & LOGIN ---
 function joinChat() {
     const input = document.getElementById("username-input");
-    if (!input) return alert("Lỗi: Không tìm thấy ô nhập tên!");
-    
+    if (!input) return;
+
     username = input.value.trim();
     if (!username) return alert("Vui lòng nhập tên!");
 
     const protocol = window.location.protocol === "https:" ? "wss://" : "ws://";
     const host = window.location.host;
-    
+
     ws = new WebSocket(`${protocol}${host}/ws/${username}`);
 
     ws.onopen = () => {
         console.log("✅ Đã kết nối Server");
-
-        // [QUAN TRỌNG] Lấy đúng ID từ HTML bạn gửi
-        const loginScreen = document.getElementById("login-screen");
-        const appScreen = document.getElementById("app"); 
-
-        if (loginScreen && appScreen) {
-            loginScreen.classList.add("hidden");   // Ẩn màn hình đăng nhập
-            appScreen.classList.remove("hidden");  // Hiện màn hình chat
-        } else {
-            console.error("❌ Lỗi: Không tìm thấy ID 'login-screen' hoặc 'app'");
-            alert("Lỗi giao diện! Hãy thử F5 lại trang.");
-        }
+        document.getElementById("login-screen").classList.add("hidden");
+        document.getElementById("app").classList.remove("hidden");
     };
 
     ws.onmessage = (event) => {
@@ -53,21 +48,31 @@ function joinChat() {
 
 // --- 2. XỬ LÝ TIN NHẮN TỪ SERVER ---
 function handleServerMessage(data) {
-    if (data.type === "SYSTEM") {
-        updateUserList(data.users);
+    if (data.type === "SYSTEM" || data.type === "LIST_USERS") {
+        updateUserList(data.users || []);
     } 
     else if (data.type === "TEXT" || data.type === "FILE_INFO") {
         messages.push(data);
         if (isCurrentChat(data)) {
             renderMessage(data);
         }
-    }
+    } 
     else if (data.type === "VIDEO_DATA") {
         const img = document.getElementById("remote-video-img");
         if(img) img.src = "data:image/jpeg;base64," + data.data;
     }
     else if (data.type === "CALL_REQUEST") {
         showIncomingCall(data.caller);
+    }
+    else if (data.type === "CALL_ACCEPT") {
+        const modal = document.getElementById("incoming-call-modal");
+        if (modal) modal.classList.add("hidden");
+        switchChat(data.sender); 
+        const area = document.getElementById("video-area");
+        if(area) {
+            area.classList.remove("hidden");
+            startLocalVideo();
+        }
     }
     else if (data.type === "CALL_END") {
         closeVideoArea();
@@ -78,8 +83,8 @@ function handleServerMessage(data) {
 function updateUserList(users) {
     const list = document.getElementById("user-list");
     if (!list) return;
-    
-    list.innerHTML = ""; 
+
+    list.innerHTML = "";
 
     // Chat Nhóm
     const groupLi = document.createElement("li");
@@ -94,14 +99,14 @@ function updateUserList(users) {
     `;
     list.appendChild(groupLi);
 
-    // Chat Riêng
+    // User Online
     users.forEach(u => {
         if (u === username) return;
-        
+
         const li = document.createElement("li");
         li.className = `user-item ${currentChat === u ? 'active' : ''}`;
         li.onclick = () => switchChat(u);
-        
+
         const initial = u.charAt(0).toUpperCase();
         li.innerHTML = `
             <div class="avatar" style="${getAvatarColor(u)}">${initial}</div>
@@ -122,11 +127,12 @@ function renderMessage(data) {
     const isMe = data.sender === username;
     const div = document.createElement("div");
     div.className = `message ${isMe ? 'sent' : 'received'}`;
-    
+
     const senderHtml = !isMe ? `<div class="sender-name">${data.sender}</div>` : '';
     const time = new Date(data.timestamp || Date.now()).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-
+    
     let contentHtml = "";
+
     if (data.type === "FILE_INFO") {
         const url = `/downloads/${data.filename}`;
         if (data.file_type === "image") {
@@ -143,7 +149,7 @@ function renderMessage(data) {
             `;
         }
     } else {
-        contentHtml = data.message || data.content;
+        contentHtml = data.message || data.content || "";
     }
 
     div.innerHTML = `
@@ -160,24 +166,19 @@ function renderMessage(data) {
 // --- 5. CHUYỂN TAB CHAT ---
 function switchChat(user) {
     currentChat = user;
-    
+
     const title = document.getElementById("chat-title");
     const status = document.getElementById("chat-status");
     if(title) title.innerText = user ? user : "Trò chuyện nhóm";
     if(status) status.innerText = user ? "Online" : "Trực tuyến";
 
-    // Update Active Class
-    // Cách đơn giản nhất để refresh active state là gọi lại updateUserList 
-    // (hoặc thao tác classList thủ công nếu muốn tối ưu)
     const items = document.querySelectorAll(".user-item");
     items.forEach(el => {
         el.classList.remove("active");
-        // Logic check active thủ công
         if (user === null && el.innerHTML.includes("Trò chuyện nhóm")) el.classList.add("active");
         else if (user && el.innerHTML.includes(user)) el.classList.add("active");
     });
 
-    // Render lại tin nhắn
     const msgBox = document.getElementById("messages");
     if(msgBox) {
         msgBox.innerHTML = "";
@@ -193,7 +194,7 @@ function isCurrentChat(msg) {
            (msg.sender === username && msg.recipient === currentChat);
 }
 
-// --- 6. GỬI TIN & UPLOAD ---
+// --- 6. GỬI TIN ---
 function sendMessage() {
     const input = document.getElementById("message-input");
     if (!input) return;
@@ -220,30 +221,115 @@ function sendMessage() {
 
 function handleEnter(e) { if(e.key === "Enter") sendMessage(); }
 
+// --- 7. UPLOAD FILE (WebSocket Stream + Speed Control) ---
 async function uploadFile() {
     const fileInput = document.getElementById("file-input");
-    if (!fileInput) return;
+    if (!fileInput || !fileInput.files.length) return;
+    
     const file = fileInput.files[0];
-    if (!file) return;
+    const filesize = file.size;
+    const filename = file.name;
+    const recipient = currentChat || "";
 
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("username", username);
-    formData.append("recipient", currentChat || ""); 
+    // 1. Reset UI
+    isUploading = true;
+    uploadCancelled = false;
+    
+    const progressContainer = document.getElementById("upload-progress-container");
+    const filenameLabel = document.getElementById("upload-filename");
+    const percentLabel = document.getElementById("upload-percent");
+    const bar = document.getElementById("upload-bar");
 
-    try {
-        await fetch("/upload", { method: "POST", body: formData });
-    } catch (e) {
-        alert("Lỗi upload file!");
+    if(progressContainer) {
+        progressContainer.classList.remove("hidden");
+        filenameLabel.innerText = `Đang gửi: ${filename}`;
+        percentLabel.innerText = "0%";
+        bar.style.width = "0%";
     }
-    fileInput.value = ""; 
+
+    // 2. Gửi Header (Báo hiệu bắt đầu)
+    ws.send(JSON.stringify({
+        type: "FILE_UPLOAD_START",
+        data: {
+            filename: filename,
+            filesize: filesize,
+            recipient: recipient
+        }
+    }));
+
+    // 3. Bắt đầu gửi file từng phần
+    let offset = 0;
+    const reader = new FileReader();
+
+    const sendNextChunk = () => {
+        if (uploadCancelled) {
+            resetUploadUI();
+            return;
+        }
+        // Cắt file
+        const slice = file.slice(offset, offset + CHUNK_SIZE);
+        reader.readAsArrayBuffer(slice);
+    };
+
+    reader.onload = async (e) => {
+        if (!isUploading) return;
+
+        const chunk = e.target.result; // ArrayBuffer
+        const chunkLen = chunk.byteLength;
+        const startTime = Date.now();
+
+        // [QUAN TRỌNG] Gửi Binary Data qua WebSocket
+        ws.send(chunk);
+
+        // --- Logic Giới Hạn Tốc Độ ---
+        const expectedDuration = (chunkLen / UPLOAD_SPEED_LIMIT) * 1000; // ms
+        const actualDuration = Date.now() - startTime;
+        
+        // Nếu gửi nhanh hơn tốc độ cho phép -> Ngủ bù
+        if (actualDuration < expectedDuration) {
+            await new Promise(r => setTimeout(r, expectedDuration - actualDuration));
+        }
+        // -----------------------------
+
+        offset += chunkLen;
+
+        // Cập nhật UI
+        const percent = Math.min((offset / filesize) * 100, 100);
+        if(bar) bar.style.width = percent + "%";
+        if(percentLabel) percentLabel.innerText = Math.round(percent) + "%";
+
+        // Kiểm tra xong chưa
+        if (offset < filesize) {
+            sendNextChunk(); // Tiếp tục gói sau
+        } else {
+            console.log("Upload hoàn tất");
+            resetUploadUI();
+        }
+    };
+
+    // Bắt đầu
+    sendNextChunk();
+    fileInput.value = "";
 }
 
-// --- 7. VIDEO CALL ---
+function cancelWebUpload() {
+    uploadCancelled = true;
+    isUploading = false;
+    resetUploadUI();
+    // Gửi tín hiệu hủy cho server
+    ws.send(JSON.stringify({ type: "FILE_UPLOAD_CANCEL" }));
+}
+
+function resetUploadUI() {
+    const progressContainer = document.getElementById("upload-progress-container");
+    if (progressContainer) progressContainer.classList.add("hidden");
+}
+
+// --- 8. VIDEO CALL ---
 function toggleVideo() {
     if (!currentChat) return alert("Chỉ hỗ trợ gọi video trong Chat Riêng!");
     ws.send(JSON.stringify({ type: "CALL_REQUEST", caller: username, recipient: currentChat }));
-    
+
     const area = document.getElementById("video-area");
     if(area) {
         area.classList.remove("hidden");
@@ -265,7 +351,6 @@ async function startLocalVideo() {
 function closeVideoArea() {
     const area = document.getElementById("video-area");
     if (area) area.classList.add("hidden");
-    
     const video = document.getElementById("local-video");
     if(video && video.srcObject) {
         video.srcObject.getTracks().forEach(t => t.stop());
@@ -273,11 +358,12 @@ function closeVideoArea() {
 }
 
 function endCall() {
-    ws.send(JSON.stringify({ type: "CALL_END", recipient: currentChat, sender: username }));
+    if (ws && currentChat) {
+        ws.send(JSON.stringify({ type: "CALL_END", recipient: currentChat, sender: username }));
+    }
     closeVideoArea();
 }
 
-// Modal Call
 function showIncomingCall(caller) {
     const nameEl = document.getElementById("caller-name");
     const modal = document.getElementById("incoming-call-modal");
@@ -286,34 +372,24 @@ function showIncomingCall(caller) {
         modal.classList.remove("hidden");
     }
 }
+
 function acceptCall() {
     const modal = document.getElementById("incoming-call-modal");
     if (modal) modal.classList.add("hidden");
-
     const nameEl = document.getElementById("caller-name");
     const callerName = nameEl ? nameEl.innerText.replace(" đang gọi...", "") : "";
-    
-    switchChat(callerName);
-    ws.send(JSON.stringify({ type: "CALL_ACCEPT", recipient: callerName, sender: username }));
-    
-    const area = document.getElementById("video-area");
-    if(area) {
-        area.classList.remove("hidden");
-        startLocalVideo();
+    if (ws) {
+        ws.send(JSON.stringify({ type: "CALL_ACCEPT", recipient: callerName, sender: username }));
     }
 }
+
 function rejectCall() {
     const modal = document.getElementById("incoming-call-modal");
     if (modal) modal.classList.add("hidden");
 }
 
-// Utils
 function getAvatarColor(name) {
-    const colors = [
-        "background: linear-gradient(135deg, #667eea, #764ba2)",
-        "background: linear-gradient(135deg, #ff9a9e, #fecfef)",
-        "background: linear-gradient(135deg, #43e97b, #38f9d7)"
-    ];
+    const colors = ["background: linear-gradient(135deg, #667eea, #764ba2)", "background: linear-gradient(135deg, #ff9a9e, #fecfef)", "background: linear-gradient(135deg, #43e97b, #38f9d7)"];
     let hash = 0;
     for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
     return colors[Math.abs(hash) % colors.length];

@@ -25,7 +25,13 @@ os.makedirs(SERVER_STORAGE_DIR, exist_ok=True)
 # --- LIFESPAN ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    main_loop = asyncio.get_running_loop()
+    # Lấy hoặc tạo event loop cho TCP Server chạy nền
+    try:
+        main_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        main_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(main_loop)
+
     tcp_thread = TCPServer(main_loop)
     tcp_thread.daemon = True 
     tcp_thread.start()
@@ -53,15 +59,14 @@ app.mount("/downloads", StaticFiles(directory=SERVER_STORAGE_DIR), name="downloa
 async def get():
     return FileResponse(os.path.join(static_dir, 'index.html'))
 
-# --- API UPLOAD FILE (ĐÃ SỬA LẠI LOGIC) ---
+# --- API UPLOAD FILE (GIỮ LẠI ĐỂ TƯƠNG THÍCH DESKTOP/FALLBACK) ---
 @app.post("/upload")
 async def upload_file(
     file: UploadFile = File(...), 
     username: str = Form(...),
-    recipient: str = Form(None)  # <--- [FIX 1] Thêm tham số nhận người nhận
+    recipient: str = Form(None)
 ):
     try:
-        # Xử lý chuỗi "None" hoặc rỗng do Client gửi lên
         if recipient == "None" or recipient == "":
             recipient = None
 
@@ -74,11 +79,10 @@ async def upload_file(
             
         file_size = os.path.getsize(file_path)
         
-        # Tạo tin nhắn thông báo file đầy đủ thông tin
         file_info_msg = {
             "type": "FILE_INFO",
             "sender": username,
-            "recipient": recipient, # <--- [FIX 2] Gắn người nhận vào tin nhắn
+            "recipient": recipient,
             "filename": safe_filename,
             "original_filename": file.filename,
             "filesize": file_size,
@@ -86,10 +90,6 @@ async def upload_file(
             "timestamp": datetime.now().isoformat()
         }
         
-        # [FIX 3] Dùng handle_message thay vì broadcast
-        # handle_message sẽ tự kiểm tra:
-        # - Nếu có recipient -> Gửi riêng (Private Chat)
-        # - Nếu recipient là None -> Gửi chung (Group Chat)
         await global_bridge.handle_message(file_info_msg, sender=username)
         
         return {"status": "success", "filename": safe_filename}
@@ -98,26 +98,28 @@ async def upload_file(
         print(f"Upload Error: {e}")
         return {"status": "error", "message": str(e)}
 
-# --- WEBSOCKET CHAT ---
+# --- WEBSOCKET CHAT (ĐÃ CẬP NHẬT ĐỂ HỖ TRỢ UPLOAD STREAM) ---
 @app.websocket("/ws/{username}")
 async def websocket_endpoint(websocket: WebSocket, username: str):
+    """
+    Endpoint chính xử lý kết nối Web.
+    """
+    # 1. Đăng ký user vào Bridge
     await global_bridge.add_web(username, websocket)
+    
+    # 2. Gửi danh sách user cập nhật
     try:
         users = list(global_bridge.tcp_clients.keys()) + list(global_bridge.web_clients.keys())
+        # Gửi riêng cho người mới
+        await websocket.send_json({"type": "SYSTEM", "users": users})
+        # Thông báo cho mọi người
         await global_bridge.broadcast({"type": "SYSTEM", "users": users})
+    except: pass
 
-        while True:
-            data = await websocket.receive_json()
-            if "sender" not in data: data["sender"] = username
-            await global_bridge.handle_message(data, sender=username)
-            
-    except WebSocketDisconnect:
-        global_bridge.remove_user(username)
-        users = list(global_bridge.tcp_clients.keys()) + list(global_bridge.web_clients.keys())
-        await global_bridge.broadcast({"type": "SYSTEM", "users": users})
-    except Exception as e:
-        print(f"WS Error: {e}")
-        global_bridge.remove_user(username)
+    # 3. [FIX QUAN TRỌNG] Chuyển giao việc lắng nghe cho Bridge
+    # Hàm listen_to_web_user (trong bridge.py) sử dụng `receive()` thay vì `receive_json()`
+    # giúp nhận được cả Text (Chat) và Binary (File Upload từ script.js mới)
+    await global_bridge.listen_to_web_user(username)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
