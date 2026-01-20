@@ -10,113 +10,113 @@ from server.handlers.file_handler import FileHandler
 class TCPServer(threading.Thread):
     def __init__(self, main_loop): 
         super().__init__()
+        self.host = "0.0.0.0"
+        self.port = 5555
+        self.running = True
+        self.server_socket = None
+        
+        # Lưu event loop của FastAPI để gọi các hàm async
+        self.main_loop = main_loop 
+        
+        # [FIX QUAN TRỌNG] Khai báo đường dẫn lưu file để FileHandler dùng
         self.storage_dir = SERVER_STORAGE_DIR
         os.makedirs(self.storage_dir, exist_ok=True)
-        self.main_loop = main_loop 
+        
+        # Khởi tạo File Handler
+        self.file_handler = FileHandler(self)
 
     def run(self):
-        HOST = "0.0.0.0"
-        PORT = 5555
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
-            sock.bind((HOST, PORT))
-            sock.listen(5)
-            print(f"🚀 TCP Server đang chạy tại port {PORT}")
+            self.server_socket.bind((self.host, self.port))
+            self.server_socket.listen(5)
+            print(f"🚀 TCP Server đang chạy tại port {self.port}")
             
-            while True:
-                client, addr = sock.accept()
-                threading.Thread(target=self.handle_client, args=(client,), daemon=True).start()
+            while self.running:
+                try:
+                    client_sock, addr = self.server_socket.accept()
+                    # Tạo thread riêng cho mỗi client kết nối
+                    threading.Thread(target=self.handle_client, args=(client_sock,), daemon=True).start()
+                except OSError:
+                    break
+                    
         except Exception as e:
-            print(f"❌ TCP Server Error: {e}")
+            print(f"❌ TCP Server Start Error: {e}")
 
-    def handle_client(self, client):
+    def handle_client(self, client_socket):
         username = None
-        file_handler = FileHandler(self)
-
         try:
             while True:
-                msg_type, data = Protocol.recv_message(client)
-                if not msg_type: break 
+                # Nhận tin nhắn từ Client
+                msg_type, data = Protocol.recv_message(client_socket)
+                
+                # Nếu không nhận được gì (client ngắt kết nối) -> Thoát
+                if not msg_type: 
+                    break 
 
-                # --- 1. LOGIN ---
+                # --- 1. XỬ LÝ LOGIN ---
                 if msg_type == MessageType.LOGIN:
                     username = data.get("username")
                     
-                    # === SỬA ĐOẠN NÀY: KHÔNG CHẶN NỮA MÀ CHO PHÉP GHI ĐÈ ===
-                    # Bridge sẽ tự động đóng socket cũ nếu trùng tên
-                    global_bridge.add_tcp(username, client)
+                    # Thêm vào Bridge
+                    global_bridge.add_tcp(username, client_socket)
                     
-                    # Phản hồi thành công
-                    Protocol.send_message(client, MessageType.LOGIN_SUCCESS, {"message": "OK"})
+                    # Phản hồi đăng nhập thành công
+                    Protocol.send_message(client_socket, MessageType.LOGIN_SUCCESS, {"message": "OK"})
+                    
+                    # Gửi danh sách user
                     self._update_user_lists()
 
-                # --- 2. TEXT CHAT ---
-                elif msg_type == MessageType.TEXT:
-                    msg = {
-                        "type": "TEXT",
-                        "content": data.get("message"),
-                        "sender": username,
-                        "recipient": data.get("recipient"),
-                        "timestamp": data.get("timestamp")
-                    }
-                    self._run_on_main_loop(global_bridge.handle_message(msg, sender=username))
-                
-                # --- 3. FILE & CALL (Giữ nguyên) ---
+                # --- 2. XỬ LÝ FILE (Upload/Download) ---
                 elif msg_type == MessageType.FILE_UPLOAD:
-                    file_handler.handle_file_upload(client, username, data)
+                    self.file_handler.handle_file_upload(client_socket, username, data)
+                
                 elif msg_type == MessageType.FILE_DOWNLOAD:
-                    file_handler.handle_file_download(client, data)
-                elif msg_type == MessageType.CALL_REQUEST:
-                    recipient = data.get("recipient")
-                    if recipient in global_bridge.tcp_clients:
-                         Protocol.send_message(global_bridge.tcp_clients[recipient], MessageType.CALL_REQUEST, data)
-                elif msg_type == MessageType.CALL_ACCEPT:
-                     target = data.get("recipient")
-                     if target in global_bridge.tcp_clients:
-                         Protocol.send_message(global_bridge.tcp_clients[target], MessageType.CALL_ACCEPT, data)
-                elif msg_type == MessageType.VIDEO_DATA or msg_type == MessageType.AUDIO_DATA:
-                    recipient = data.get("recipient")
-                    if recipient and recipient in global_bridge.tcp_clients:
-                        Protocol.send_message(global_bridge.tcp_clients[recipient], msg_type, data)
+                    self.file_handler.handle_file_download(client_socket, data)
 
+                # --- 3. XỬ LÝ CHUNG (CHAT, VIDEO CALL...) ---
+                else:
+                    if isinstance(data, dict):
+                        data["sender"] = username
+                        data["type"] = msg_type
+                    
+                    # Chuyển qua Bridge (chạy trên Main Thread)
+                    self._run_on_main_loop(
+                        global_bridge.handle_message(data, sender=username)
+                    )
+
+        except (ConnectionResetError, ConnectionAbortedError):
+            print(f"🔌 Client {username} ngắt kết nối đột ngột.")
         except Exception as e:
-            # Lỗi này thường xảy ra khi socket cũ bị close() do user mới đăng nhập
-            # Đây là điều bình thường, không cần in ra nếu không muốn spam log
-            pass 
+            print(f"❌ Error handling TCP client {username}: {e}")
         finally:
-            # Chỉ remove nếu socket hiện tại vẫn đang là socket chính chủ của user đó
-            # (Tránh trường hợp user mới vừa vào, thread cũ này chạy finally và xóa luôn user mới)
-            if username and global_bridge.tcp_clients.get(username) == client:
-                global_bridge.remove_user(username)
-                self._update_user_lists()
+            # Dọn dẹp khi ngắt kết nối
+            if username:
+                # Kiểm tra socket chính chủ trước khi xóa
+                if global_bridge.tcp_clients.get(username) == client_socket:
+                    global_bridge.remove_tcp(username)
+                    self._update_user_lists()
             
-            try: client.close()
+            try: client_socket.close()
             except: pass
 
     def _update_user_lists(self):
+        """Cập nhật danh sách online cho tất cả mọi người"""
         users = list(global_bridge.tcp_clients.keys()) + list(global_bridge.web_clients.keys())
+        
+        # 1. Gửi cho Web Clients
+        self._run_on_main_loop(global_bridge.broadcast({"type": "SYSTEM", "users": users}))
+        
+        # 2. Gửi cho TCP Clients
         msg_data = {"users": users}
         for sock in global_bridge.tcp_clients.values():
-            try: Protocol.send_message(sock, MessageType.LIST_USERS, msg_data)
+            try: 
+                Protocol.send_message(sock, MessageType.LIST_USERS, msg_data)
             except: pass
-        self._run_on_main_loop(global_bridge.broadcast({"type": "SYSTEM", "users": users}))
-
-    def broadcast(self, msg_type, data, exclude=None):
-        for user, sock in global_bridge.tcp_clients.items():
-            if user == exclude: continue
-            try: Protocol.send_message(sock, msg_type, data)
-            except: pass
-        
-        if msg_type == MessageType.FILE_INFO:
-            web_msg = {
-                "type": "FILE_INFO", "sender": data.get("sender"),
-                "filename": data.get("filename"), "original_filename": data.get("original_filename"),
-                "filesize": data.get("filesize"), "file_type": data.get("file_type")
-            }
-            self._run_on_main_loop(global_bridge.broadcast(web_msg, sender=exclude))
 
     def _run_on_main_loop(self, coro):
+        """Helper để chạy Coroutine trên Main Thread"""
         if self.main_loop and self.main_loop.is_running():
             asyncio.run_coroutine_threadsafe(coro, self.main_loop)

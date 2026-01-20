@@ -7,8 +7,8 @@ let currentChat = null; // null = Chat nhóm
 let messages = [];      // Lưu trữ lịch sử tin nhắn
 
 // --- CẤU HÌNH UPLOAD ---
-const UPLOAD_SPEED_LIMIT = 512 * 1024; // 512 KB/s (Giới hạn tốc độ)
-const CHUNK_SIZE = 8192; // 8KB mỗi gói
+const UPLOAD_SPEED_LIMIT = 512 * 1024; // 512 KB/s
+const CHUNK_SIZE = 8192; // 8KB
 let isUploading = false;
 let uploadCancelled = false;
 
@@ -248,6 +248,7 @@ async function uploadFile() {
     }
 
     // 2. Gửi Header (Báo hiệu bắt đầu)
+    // Server sẽ nhận gói tin này và tạo file tạm
     ws.send(JSON.stringify({
         type: "FILE_UPLOAD_START",
         data: {
@@ -282,10 +283,11 @@ async function uploadFile() {
         ws.send(chunk);
 
         // --- Logic Giới Hạn Tốc Độ ---
+        // Tính thời gian cần thiết để gửi chunk này theo tốc độ giới hạn
         const expectedDuration = (chunkLen / UPLOAD_SPEED_LIMIT) * 1000; // ms
         const actualDuration = Date.now() - startTime;
         
-        // Nếu gửi nhanh hơn tốc độ cho phép -> Ngủ bù
+        // Nếu gửi quá nhanh (thực tế < lý thuyết) -> Ngủ bù
         if (actualDuration < expectedDuration) {
             await new Promise(r => setTimeout(r, expectedDuration - actualDuration));
         }

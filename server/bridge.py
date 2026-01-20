@@ -1,5 +1,5 @@
 """
-server/bridge.py - Bridge quản lý kết nối Hybrid + Hỗ trợ Upload File Stream
+server/bridge.py - Bridge quản lý kết nối Hybrid + Hỗ trợ Upload Stream
 """
 from fastapi import WebSocket, WebSocketDisconnect
 from common.protocol import Protocol, MessageType
@@ -53,7 +53,7 @@ class BridgeManager:
             del self.tcp_clients[username]
         print(f"👋 [Bridge] TCP User removed: {username}")
 
-    # --- MAIN LOOP CHO WEB CLIENT (Thay thế loop trong main.py) ---
+    # --- MAIN LOOP CHO WEB CLIENT (Xử lý Text & Bytes) ---
     async def listen_to_web_user(self, username):
         websocket = self.web_clients.get(username)
         if not websocket: return
@@ -64,7 +64,7 @@ class BridgeManager:
                 message = await websocket.receive()
 
                 # 1. Xử lý TEXT (JSON Commands)
-                if "text" in message:
+                if "text" in message and message["text"]:
                     try:
                         data = json.loads(message["text"])
                         msg_type = data.get("type")
@@ -101,7 +101,7 @@ class BridgeManager:
                         pass
 
                 # 2. Xử lý BYTES (File Chunk)
-                elif "bytes" in message:
+                elif "bytes" in message and message["bytes"]:
                     chunk = message["bytes"]
                     if username in self.active_uploads:
                         upload = self.active_uploads[username]
@@ -113,7 +113,7 @@ class BridgeManager:
                             upload["file_handle"].close()
                             print(f"✅ Web Upload Complete: {upload['filename']}")
                             
-                            # Tạo tin nhắn FILE_INFO
+                            # Tạo tin nhắn FILE_INFO để broadcast
                             file_info = {
                                 "type": "FILE_INFO",
                                 "sender": username,
@@ -136,7 +136,7 @@ class BridgeManager:
         except WebSocketDisconnect:
             await self.remove_web(username)
         except Exception as e:
-            print(f"❌ Web Error {username}: {e}")
+            # print(f"❌ Web Error {username}: {e}")
             await self.remove_web(username)
 
     async def send_to_user_web(self, username, payload):

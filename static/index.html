@@ -3,19 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zalo Dark Mode</title>
+    <title>Zalo Dark - Chat & Video</title>
     <link rel="stylesheet" href="/static/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
+
     <div id="login-screen">
         <div class="login-box">
-            <div style="font-size: 60px; color: #5288c1; margin-bottom: 20px;">
-                <i class="fab fa-telegram-plane"></i>
-            </div>
+            <i class="fab fa-telegram-plane"></i>
             <h2>Đăng nhập</h2>
-            <p>Nhập tên để tham gia trò chuyện</p>
-            <input type="text" id="username-input" placeholder="Tên hiển thị..." autocomplete="off">
+            <p>Nhập tên hiển thị để tham gia</p>
+            <input type="text" id="username-input" placeholder="Tên của bạn..." autocomplete="off">
             <button onclick="joinChat()">BẮT ĐẦU</button>
         </div>
     </div>
@@ -26,10 +25,11 @@
             <div class="sidebar-header">
                 <div class="search-box">
                     <i class="fas fa-search search-icon"></i>
-                    <input type="text" class="search-input" placeholder="Tìm kiếm...">
+                    <input type="text" placeholder="Tìm kiếm...">
                 </div>
             </div>
-            <ul id="user-list"></ul>
+            <ul id="user-list">
+                </ul>
         </div>
 
         <div class="main-chat">
@@ -40,48 +40,50 @@
                     <p id="chat-status">Trực tuyến</p>
                 </div>
                 <div class="header-actions">
-                    <button onclick="toggleVideo()" title="Gọi Video"><i class="fas fa-phone-alt"></i></button>
-                    <button><i class="fas fa-ellipsis-v"></i></button>
+                    <button onclick="toggleVideo()" title="Gọi Video"><i class="fas fa-video"></i></button>
+                    <button title="Tùy chọn"><i class="fas fa-ellipsis-v"></i></button>
                 </div>
             </div>
 
-            <div id="video-area" class="hidden" style="background: #000; padding: 10px; display: flex; justify-content: center; gap: 10px; height: 320px; border-bottom: 1px solid #333; position: relative;">
-                <div style="flex: 1; background: #222; border-radius: 8px; overflow: hidden; position: relative;">
-                    <img id="remote-video-img" style="width: 100%; height: 100%; object-fit: contain;">
-                    <div style="position: absolute; bottom: 5px; left: 10px; color: white; background: rgba(0,0,0,0.5); padding: 2px 8px; border-radius: 4px; font-size: 12px;">Người khác</div>
+            <div id="video-area" class="hidden">
+                <div class="video-remote-container">
+                    <img id="remote-video-img" alt="Waiting for video...">
+                    <div class="video-label">Người khác</div>
                 </div>
-                <div style="width: 200px; background: #222; border-radius: 8px; overflow: hidden; position: relative;">
-                    <video id="local-video" autoplay muted style="width: 100%; height: 100%; object-fit: cover;"></video>
-                    <div style="position: absolute; bottom: 5px; left: 10px; color: white; background: rgba(0,0,0,0.5); padding: 2px 8px; border-radius: 4px; font-size: 12px;">Bạn</div>
+
+                <div class="video-local-container">
+                    <video id="local-video" autoplay muted playsinline></video>
+                    <div class="video-label">Bạn</div>
                 </div>
-                <button onclick="endCall()" style="position: absolute; top: 10px; right: 10px; background: #ff3b30; color: white; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer;"><i class="fas fa-times"></i></button>
+
+                <button onclick="endCall()" class="btn-hangup" title="Kết thúc">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
             </div>
 
             <div id="messages" class="messages-area"></div>
 
-            <div id="upload-progress-container" class="hidden" style="background: #17212b; padding: 8px 20px; border-top: 1px solid #0e1621;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 5px; color: white; font-size: 13px;">
-                    <span id="upload-filename" style="font-weight: bold;">Đang tải file...</span>
-                    <span id="upload-percent" style="color: #4BB543;">0%</span>
+            <div id="upload-progress-container" class="hidden">
+                <div class="upload-header">
+                    <span id="upload-filename">Đang tải file...</span>
+                    <span id="upload-percent">0%</span>
                 </div>
-                <div style="width: 100%; background: #0e1621; height: 6px; border-radius: 3px; overflow: hidden;">
-                    <div id="upload-bar" style="width: 0%; height: 100%; background: #4BB543; border-radius: 3px; transition: width 0.1s;"></div>
+                <div class="progress-track">
+                    <div id="upload-bar"></div>
                 </div>
-                <div style="text-align: right; margin-top: 5px;">
-                    <button onclick="cancelWebUpload()" style="background: #ff3b30; color: white; border: none; padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold;">HỦY UPLOAD</button>
-                </div>
+                <button onclick="cancelWebUpload()" class="btn-cancel-upload">HỦY</button>
             </div>
 
             <div class="input-area">
                 <input type="file" id="file-input" hidden onchange="uploadFile()">
                 
-                <button class="attach-btn" onclick="document.getElementById('file-input').click()" title="Gửi file">
+                <button class="action-btn attach-btn" onclick="document.getElementById('file-input').click()" title="Gửi file">
                     <i class="fas fa-paperclip"></i>
                 </button>
 
                 <input type="text" id="message-input" placeholder="Viết tin nhắn..." onkeypress="handleEnter(event)" autocomplete="off">
 
-                <button class="send-btn" onclick="sendMessage()" title="Gửi">
+                <button class="action-btn send-btn" onclick="sendMessage()" title="Gửi">
                     <i class="fas fa-paper-plane"></i>
                 </button>
             </div>
@@ -90,12 +92,19 @@
 
     <div id="incoming-call-modal" class="modal hidden">
         <div class="modal-content">
-            <div style="font-size: 60px; color: #5288c1; margin-bottom: 20px;"><i class="fas fa-user-circle"></i></div>
+            <div class="call-avatar">
+                <i class="fas fa-video"></i>
+            </div>
             <h3 id="caller-name" style="color: white; margin-bottom: 5px;">User đang gọi...</h3>
-            <p style="color: #7f91a4; margin-bottom: 25px;">Cuộc gọi video đến</p>
-            <div>
-                <button onclick="rejectCall()" class="btn-reject"><i class="fas fa-phone-slash"></i> Từ chối</button>
-                <button onclick="acceptCall()" class="btn-accept"><i class="fas fa-video"></i> Nghe máy</button>
+            <p style="color: #7f91a4;">Cuộc gọi video đến</p>
+            
+            <div class="modal-actions">
+                <button onclick="rejectCall()" class="btn-call btn-reject" title="Từ chối">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+                <button onclick="acceptCall()" class="btn-call btn-accept" title="Trả lời">
+                    <i class="fas fa-phone"></i>
+                </button>
             </div>
         </div>
     </div>
