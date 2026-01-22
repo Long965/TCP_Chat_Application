@@ -1,30 +1,31 @@
-/* static/styles.css - Zalo Dark Mode Clone (Updated) */
+/* static/styles.css - Light Mode (Clean & Modern) */
 :root {
-    /* Bảng màu chuẩn */
-    --bg-main: #0e1621;         
-    --bg-sidebar: #17212b;      
-    --bg-input: #17212b;        
-    --bg-hover: #202b36;        
-    --active-item: #2b5278;     
-    
-    --text-primary: #f5f5f5;    
-    --text-secondary: #7f91a4;  
-    --accent: #5288c1;          
+    /* Color Palette - Light */
+    --bg-main: #FFFFFF;         /* Nền chính: Trắng */
+    --bg-sidebar: #F7F7F7;      /* Nền Sidebar: Xám rất nhạt */
+    --bg-hover: #E6E6E6;        /* Hover item */
+    --active-item: #E3F2FD;     /* Item đang chọn: Xanh nhạt */
 
-    --msg-out-bg: #2b5278;      
-    --msg-in-bg: #182533;       
+    --text-primary: #1C1E21;    /* Chữ chính: Đen xám */
+    --text-secondary: #65676B;  /* Chữ phụ: Xám trung tính */
     
-    --border-color: #0e1621;    
-    --scroll-thumb: #2f343d;
-    --danger: #ff3b30;
-    --success: #4cd964;
+    --accent: #0084FF;          /* Màu chủ đạo: Xanh Messenger */
+    
+    --msg-out-bg: #0084FF;      /* Bong bóng gửi đi: Xanh đậm */
+    --msg-in-bg: #F0F2F5;       /* Bong bóng nhận: Xám nhạt */
+
+    --danger: #FF3B30;          /* Màu đỏ */
+    --success: #36A420;         /* Màu xanh lá */
+    
+    /* Viền để phân cách các vùng trên nền trắng */
+    --border-color: #E4E6EB;
 }
 
 * { box-sizing: border-box; outline: none; margin: 0; padding: 0; }
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: var(--bg-main);
+    background-color: #F0F2F5; /* Nền trang web hơi xám để nổi bật khung chat */
     color: var(--text-primary);
     height: 100vh; overflow: hidden;
     display: flex; justify-content: center; align-items: center;
@@ -32,245 +33,235 @@ body {
 
 .hidden { display: none !important; }
 
-/* --- LOGIN SCREEN --- */
+/* --- 1. LOGIN SCREEN --- */
 #login-screen {
     position: absolute; width: 100%; height: 100%;
     display: flex; justify-content: center; align-items: center;
-    background: var(--bg-main); z-index: 1000;
+    background: #F0F2F5; z-index: 1000;
 }
-
 .login-box {
-    background: var(--bg-sidebar); padding: 40px; width: 340px;
+    background: #FFFFFF; padding: 40px; width: 340px;
     border-radius: 12px; text-align: center;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+    border: 1px solid var(--border-color);
 }
-
 .login-box i { font-size: 60px; color: var(--accent); margin-bottom: 20px; }
-.login-box h2 { margin-bottom: 10px; }
+.login-box h2 { margin-bottom: 10px; color: var(--text-primary); }
 .login-box p { color: var(--text-secondary); margin-bottom: 25px; font-size: 14px; }
-
 .login-box input {
     width: 100%; padding: 12px; margin-bottom: 15px;
-    background: var(--bg-main); border: 1px solid #303841;
-    color: white; border-radius: 6px; font-size: 15px;
+    background: #F0F2F5; border: 1px solid #ddd;
+    color: var(--text-primary); border-radius: 6px; font-size: 15px;
 }
-
 .login-box button {
     width: 100%; padding: 12px;
     background: var(--accent); color: white; border: none;
     border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 15px;
     transition: background 0.2s;
 }
-.login-box button:hover { background: #406b94; }
+.login-box button:hover { background: #0078E7; }
 
-/* --- MAIN APP --- */
-#app { display: flex; width: 100%; height: 100%; max-width: 1600px; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+/* --- 2. MAIN APP LAYOUT --- */
+#app { 
+    display: flex; width: 100%; height: 100%; max-width: 1600px; 
+    background: var(--bg-main);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); /* Đổ bóng nhẹ thay vì phát sáng */
+    border-radius: 12px; 
+    overflow: hidden; 
+}
 
 /* SIDEBAR */
 .sidebar {
     width: 320px; background: var(--bg-sidebar);
-    border-right: 1px solid #000; display: flex; flex-direction: column;
+    border-right: 1px solid var(--border-color); 
+    display: flex; flex-direction: column;
 }
-
 .sidebar-header { padding: 15px; }
 .search-box { position: relative; }
 .search-box input {
     width: 100%; padding: 10px 15px 10px 40px;
-    background: #242f3d; border: none; border-radius: 20px;
-    color: white; font-size: 14px;
+    background: #E4E6EB; border: none; border-radius: 20px;
+    color: var(--text-primary); font-size: 14px;
 }
+.search-box input::placeholder { color: #8A8D91; }
 .search-icon {
     position: absolute; left: 15px; top: 50%; transform: translateY(-50%);
-    color: var(--text-secondary);
+    color: #8A8D91;
 }
-
 #user-list { flex: 1; overflow-y: auto; list-style: none; }
 .user-item {
     display: flex; align-items: center; padding: 12px 15px;
-    cursor: pointer; transition: 0.2s; border-bottom: 1px solid rgba(0,0,0,0.1);
+    cursor: pointer; transition: 0.2s; border-bottom: 1px solid transparent;
 }
-.user-item:hover { background: var(--bg-hover); }
-.user-item.active { background: var(--active-item); }
+.user-item:hover { background: var(--bg-hover); margin: 0 8px; border-radius: 8px; }
+.user-item.active { background: var(--active-item); margin: 0 8px; border-radius: 8px; }
 
 .avatar {
     width: 48px; height: 48px; border-radius: 50%;
     display: flex; justify-content: center; align-items: center;
     font-size: 20px; color: white; margin-right: 15px; flex-shrink: 0;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    font-weight: bold;
+    text-shadow: none;
 }
-
-.user-info .user-name { font-weight: 600; font-size: 15px; }
+.user-info .user-name { font-weight: 600; font-size: 15px; color: var(--text-primary); }
 .user-info .user-preview { font-size: 13px; color: var(--text-secondary); margin-top: 3px; }
-.active .user-preview { color: #dceaf5; }
+.active .user-preview { color: var(--text-secondary); }
 
-/* MAIN CHAT */
+/* CHAT AREA */
 .main-chat { flex: 1; display: flex; flex-direction: column; background: var(--bg-main); position: relative; }
-
-/* HEADER */
 .chat-header {
-    height: 64px; background: var(--bg-sidebar);
+    height: 64px; background: var(--bg-main);
     padding: 0 20px; display: flex; justify-content: space-between; align-items: center;
-    border-bottom: 1px solid #000;
+    border-bottom: 1px solid var(--border-color);
 }
-.header-info h3 { font-size: 16px; margin-bottom: 2px; }
+.header-info h3 { font-size: 16px; margin-bottom: 2px; color: var(--text-primary); }
 .header-info p { font-size: 13px; color: var(--success); }
-
 .header-actions button {
-    background: none; border: none; color: var(--text-secondary);
+    background: none; border: none; color: var(--accent);
     font-size: 20px; padding: 8px 12px; cursor: pointer; transition: 0.2s;
     border-radius: 50%;
 }
-.header-actions button:hover { background: rgba(255,255,255,0.05); color: var(--accent); }
+.header-actions button:hover { background: var(--bg-hover); }
 
-/* --- VIDEO CALL AREA (Picture-in-Picture Style) --- */
+/* --- 3. VIDEO CALL AREA --- */
 #video-area {
     background: #000;
-    height: 400px; /* Chiều cao khu vực video */
-    position: relative;
+    height: 450px; position: relative;
     border-bottom: 1px solid #333;
     overflow: hidden;
     display: flex; align-items: center; justify-content: center;
+    transition: height 0.3s ease;
 }
-
-/* Video người khác (Lớn) */
-.video-remote-container {
-    width: 100%; height: 100%;
-    display: flex; align-items: center; justify-content: center;
-}
-#remote-video-img {
-    max-width: 100%; max-height: 100%;
-    object-fit: contain;
-}
-
-/* Video của bạn (Nhỏ - Góc phải) */
+/* Video Remote */
+.video-remote-container { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: #1a1a1a; }
+#remote-video-img { max-width: 100%; max-height: 100%; object-fit: contain; }
+/* Video Local */
 .video-local-container {
     position: absolute; bottom: 20px; right: 20px;
-    width: 140px; height: 100px; /* Tỉ lệ 4:3 hoặc tùy chỉnh */
+    width: 140px; height: 105px;
     background: #333;
-    border: 2px solid rgba(255,255,255,0.2);
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-    z-index: 10;
+    border: 2px solid rgba(255,255,255,0.3); border-radius: 12px;
+    overflow: hidden; box-shadow: 0 8px 20px rgba(0,0,0,0.6); z-index: 10;
 }
-#local-video {
-    width: 100%; height: 100%;
-    object-fit: cover;
-    transform: scaleX(-1); /* Lật gương */
-}
+#local-video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
 
-/* Nhãn tên trên video */
 .video-label {
-    position: absolute; bottom: 5px; left: 5px;
+    position: absolute; bottom: 5px; left: 8px;
     background: rgba(0,0,0,0.6); color: white;
-    padding: 2px 6px; border-radius: 4px; font-size: 11px;
+    padding: 2px 8px; border-radius: 10px; font-size: 11px;
     pointer-events: none;
 }
-
-/* Nút tắt cuộc gọi */
 .btn-hangup {
     position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-    width: 56px; height: 56px;
+    width: 60px; height: 60px;
     background: var(--danger); border: none; border-radius: 50%;
     color: white; font-size: 24px; cursor: pointer;
-    box-shadow: 0 4px 10px rgba(255, 59, 48, 0.4);
-    transition: transform 0.2s; z-index: 20;
-    display: flex; justify-content: center; align-items: center;
+    box-shadow: 0 4px 15px rgba(255, 59, 48, 0.5);
+    display: flex; justify-content: center; align-items: center; z-index: 20;
 }
-.btn-hangup:hover { transform: translateX(-50%) scale(1.1); background: #d32f2f; }
 
-/* MESSAGES */
+/* --- 4. MESSAGES --- */
 .messages-area {
     flex: 1; padding: 20px; overflow-y: auto;
     display: flex; flex-direction: column; gap: 12px;
-    background-image: radial-gradient(#1e2c3a 1px, transparent 1px);
-    background-size: 20px 20px;
+    background: var(--bg-main);
+    background-image: none; /* Bỏ pattern tối */
 }
-
 .message { max-width: 70%; display: flex; flex-direction: column; }
 .message.sent { align-self: flex-end; align-items: flex-end; }
 .message.received { align-self: flex-start; align-items: flex-start; }
 
 .bubble {
-    padding: 10px 14px; border-radius: 12px;
+    padding: 10px 14px; border-radius: 18px;
     font-size: 15px; line-height: 1.5;
-    position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    position: relative; box-shadow: 0 1px 2px rgba(0,0,0,0.1);
 }
-.sent .bubble { background: var(--msg-out-bg); color: white; border-bottom-right-radius: 2px; }
-.received .bubble { background: var(--msg-in-bg); color: white; border-bottom-left-radius: 2px; }
-
-.sender-name { font-size: 12px; font-weight: bold; color: var(--accent); margin-bottom: 4px; }
-.msg-time { font-size: 11px; color: rgba(255,255,255,0.5); text-align: right; display: block; margin-top: 4px; }
+.sent .bubble { 
+    background: var(--msg-out-bg); 
+    color: white; /* Chữ trắng trên nền xanh */
+    border-bottom-right-radius: 4px; 
+}
+.received .bubble { 
+    background: var(--msg-in-bg); 
+    color: var(--text-primary); /* Chữ đen trên nền xám */
+    border-bottom-left-radius: 4px; 
+}
+.sender-name { font-size: 12px; font-weight: bold; color: var(--text-secondary); margin-bottom: 4px; }
+.sent .msg-time { font-size: 11px; color: rgba(255,255,255,0.8); text-align: right; display: block; margin-top: 4px; }
+.received .msg-time { font-size: 11px; color: var(--text-secondary); text-align: right; display: block; margin-top: 4px; }
 
 /* FILE ATTACHMENT */
 .file-attachment {
     display: flex; align-items: center; gap: 12px;
-    background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px;
-    text-decoration: none; color: white; transition: 0.2s;
+    background: rgba(255,255,255,0.2); padding: 10px; border-radius: 8px;
+    text-decoration: none; color: inherit; transition: 0.2s;
+    border: 1px solid rgba(0,0,0,0.1);
 }
-.file-attachment:hover { background: rgba(0,0,0,0.3); }
-.file-icon { font-size: 24px; color: var(--accent); }
-.file-info div:first-child { font-weight: 600; font-size: 14px; }
-.file-info div:last-child { font-size: 12px; opacity: 0.8; }
+/* File gửi đi (nền xanh) */
+.sent .file-attachment { background: rgba(255,255,255,0.2); color: white; }
+/* File nhận (nền xám) */
+.received .file-attachment { background: rgba(0,0,0,0.05); color: var(--text-primary); }
 
-/* UPLOAD PROGRESS */
+.file-icon { font-size: 24px; }
+.sent .file-icon { color: white; }
+.received .file-icon { color: var(--text-primary); }
+
+/* --- 5. UPLOAD PROGRESS --- */
 #upload-progress-container {
-    background: var(--bg-sidebar); padding: 10px 20px;
-    border-top: 1px solid #000; animation: slideUp 0.3s ease;
+    background: var(--bg-main); padding: 15px 20px;
+    border-top: 1px solid var(--border-color);
 }
-@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-
-.upload-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; color: #ccc; }
-.progress-track { width: 100%; height: 4px; background: #0e1621; border-radius: 2px; overflow: hidden; }
+.upload-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; color: var(--text-secondary); }
+.progress-track { width: 100%; height: 6px; background: #E4E6EB; border-radius: 3px; overflow: hidden; }
 #upload-bar { height: 100%; background: var(--success); width: 0%; transition: width 0.2s; }
 .btn-cancel-upload {
     background: none; border: none; color: var(--danger);
-    font-size: 12px; font-weight: bold; cursor: pointer; float: right; margin-top: 6px;
+    font-size: 12px; font-weight: bold; cursor: pointer; float: right; margin-top: 8px;
 }
 
-/* INPUT AREA */
+/* --- 6. INPUT AREA --- */
 .input-area {
-    padding: 15px 20px; background: var(--bg-sidebar);
+    padding: 15px 20px; background: var(--bg-main);
     display: flex; align-items: center; gap: 15px;
-    border-top: 1px solid #000;
+    border-top: 1px solid var(--border-color);
 }
 #message-input {
     flex: 1; padding: 12px 15px; border-radius: 20px; border: none;
-    background: var(--bg-main); color: white; font-size: 15px;
+    background: #F0F2F5; color: var(--text-primary); font-size: 15px;
 }
 .action-btn {
-    background: none; border: none; color: var(--text-secondary);
+    background: none; border: none; color: var(--accent);
     font-size: 22px; cursor: pointer; transition: 0.2s;
 }
-.action-btn:hover { color: var(--accent); transform: scale(1.1); }
-.send-btn { color: var(--accent); }
+.action-btn:hover { background: var(--bg-hover); border-radius: 50%; }
 
-/* --- INCOMING CALL MODAL --- */
+/* --- 7. MODAL CALL --- */
 .modal {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.8);
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
     z-index: 2000; display: flex; justify-content: center; align-items: center;
     backdrop-filter: blur(5px);
 }
 .modal-content {
-    background: var(--bg-sidebar); padding: 40px; border-radius: 20px;
-    text-align: center; width: 320px; box-shadow: 0 20px 50px rgba(0,0,0,0.5);
-    animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    background: #FFFFFF; padding: 40px; border-radius: 24px;
+    text-align: center; width: 340px; box-shadow: 0 25px 60px rgba(0,0,0,0.3);
 }
-@keyframes popIn { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
 .call-avatar {
-    width: 90px; height: 90px; background: var(--msg-out-bg);
-    border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center;
-    font-size: 40px; color: white; box-shadow: 0 0 0 5px rgba(43, 82, 120, 0.3);
-    animation: pulse 2s infinite;
+    width: 100px; height: 100px; background: var(--msg-out-bg);
+    border-radius: 50%; margin: 0 auto 25px; display: flex; align-items: center; justify-content: center;
+    font-size: 45px; color: white;
+    animation: pulse 1.5s infinite;
 }
-@keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(43, 82, 120, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(43, 82, 120, 0); } 100% { box-shadow: 0 0 0 0 rgba(43, 82, 120, 0); } }
-
-.modal-actions { display: flex; justify-content: center; gap: 20px; margin-top: 30px; }
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(0, 132, 255, 0.4); }
+    70% { box-shadow: 0 0 0 20px rgba(0, 132, 255, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(0, 132, 255, 0); }
+}
+.modal-actions { display: flex; justify-content: center; gap: 30px; margin-top: 35px; }
 .btn-call {
-    width: 60px; height: 60px; border-radius: 50%; border: none;
-    color: white; font-size: 24px; cursor: pointer; transition: 0.2s;
+    width: 64px; height: 64px; border-radius: 50%; border: none;
+    color: white; font-size: 26px; cursor: pointer; transition: 0.2s;
     display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
 }
-.btn-reject { background: var(--danger); } .btn-reject:hover { background: #d32f2f; }
-.btn-accept { background: var(--success); } .btn-accept:hover { background: #388e3c; }
+.btn-reject { background: var(--danger); }
+.btn-accept { background: var(--success); }

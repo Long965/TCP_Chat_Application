@@ -1,5 +1,5 @@
 /**
- * static/script.js - Logic Web Client (Full + Upload Speed Limit)
+ * static/script.js - Logic Web Client (Full Fix Video Call)
  */
 let ws;
 let username = "";
@@ -57,25 +57,33 @@ function handleServerMessage(data) {
             renderMessage(data);
         }
     } 
+    // [FIX] Nhận hình ảnh từ Desktop gửi sang (Desktop gửi dạng Base64 JPEG)
     else if (data.type === "VIDEO_DATA") {
         const img = document.getElementById("remote-video-img");
-        if(img) img.src = "data:image/jpeg;base64," + data.data;
+        if(img && data.data) {
+            img.src = "data:image/jpeg;base64," + data.data;
+        }
     }
     else if (data.type === "CALL_REQUEST") {
         showIncomingCall(data.caller);
     }
     else if (data.type === "CALL_ACCEPT") {
+        // [Người Gọi] Khi đối phương chấp nhận -> Bắt đầu video
         const modal = document.getElementById("incoming-call-modal");
         if (modal) modal.classList.add("hidden");
+        
         switchChat(data.sender); 
+        
         const area = document.getElementById("video-area");
         if(area) {
             area.classList.remove("hidden");
             startLocalVideo();
         }
     }
-    else if (data.type === "CALL_END") {
+    else if (data.type === "CALL_END" || data.type === "CALL_REJECT") {
         closeVideoArea();
+        const modal = document.getElementById("incoming-call-modal");
+        if (modal) modal.classList.add("hidden");
     }
 }
 
@@ -221,7 +229,7 @@ function sendMessage() {
 
 function handleEnter(e) { if(e.key === "Enter") sendMessage(); }
 
-// --- 7. UPLOAD FILE (WebSocket Stream + Speed Control) ---
+// --- 7. UPLOAD FILE ---
 async function uploadFile() {
     const fileInput = document.getElementById("file-input");
     if (!fileInput || !fileInput.files.length) return;
@@ -231,7 +239,6 @@ async function uploadFile() {
     const filename = file.name;
     const recipient = currentChat || "";
 
-    // 1. Reset UI
     isUploading = true;
     uploadCancelled = false;
     
@@ -247,8 +254,6 @@ async function uploadFile() {
         bar.style.width = "0%";
     }
 
-    // 2. Gửi Header (Báo hiệu bắt đầu)
-    // Server sẽ nhận gói tin này và tạo file tạm
     ws.send(JSON.stringify({
         type: "FILE_UPLOAD_START",
         data: {
@@ -258,7 +263,6 @@ async function uploadFile() {
         }
     }));
 
-    // 3. Bắt đầu gửi file từng phần
     let offset = 0;
     const reader = new FileReader();
 
@@ -267,7 +271,6 @@ async function uploadFile() {
             resetUploadUI();
             return;
         }
-        // Cắt file
         const slice = file.slice(offset, offset + CHUNK_SIZE);
         reader.readAsArrayBuffer(slice);
     };
@@ -275,41 +278,33 @@ async function uploadFile() {
     reader.onload = async (e) => {
         if (!isUploading) return;
 
-        const chunk = e.target.result; // ArrayBuffer
+        const chunk = e.target.result;
         const chunkLen = chunk.byteLength;
         const startTime = Date.now();
 
-        // [QUAN TRỌNG] Gửi Binary Data qua WebSocket
         ws.send(chunk);
 
-        // --- Logic Giới Hạn Tốc Độ ---
-        // Tính thời gian cần thiết để gửi chunk này theo tốc độ giới hạn
-        const expectedDuration = (chunkLen / UPLOAD_SPEED_LIMIT) * 1000; // ms
+        const expectedDuration = (chunkLen / UPLOAD_SPEED_LIMIT) * 1000;
         const actualDuration = Date.now() - startTime;
         
-        // Nếu gửi quá nhanh (thực tế < lý thuyết) -> Ngủ bù
         if (actualDuration < expectedDuration) {
             await new Promise(r => setTimeout(r, expectedDuration - actualDuration));
         }
-        // -----------------------------
 
         offset += chunkLen;
 
-        // Cập nhật UI
         const percent = Math.min((offset / filesize) * 100, 100);
         if(bar) bar.style.width = percent + "%";
         if(percentLabel) percentLabel.innerText = Math.round(percent) + "%";
 
-        // Kiểm tra xong chưa
         if (offset < filesize) {
-            sendNextChunk(); // Tiếp tục gói sau
+            sendNextChunk();
         } else {
             console.log("Upload hoàn tất");
             resetUploadUI();
         }
     };
 
-    // Bắt đầu
     sendNextChunk();
     fileInput.value = "";
 }
@@ -318,7 +313,6 @@ function cancelWebUpload() {
     uploadCancelled = true;
     isUploading = false;
     resetUploadUI();
-    // Gửi tín hiệu hủy cho server
     ws.send(JSON.stringify({ type: "FILE_UPLOAD_CANCEL" }));
 }
 
@@ -327,7 +321,7 @@ function resetUploadUI() {
     if (progressContainer) progressContainer.classList.add("hidden");
 }
 
-// --- 8. VIDEO CALL ---
+// --- 8. VIDEO CALL (QUAN TRỌNG) ---
 function toggleVideo() {
     if (!currentChat) return alert("Chỉ hỗ trợ gọi video trong Chat Riêng!");
     ws.send(JSON.stringify({ type: "CALL_REQUEST", caller: username, recipient: currentChat }));
@@ -346,7 +340,8 @@ async function startLocalVideo() {
         if(video) video.srcObject = stream;
     } catch (e) {
         console.error("Camera Error:", e);
-        alert("Không thể truy cập Camera. Vui lòng cấp quyền!");
+        // Không alert lỗi nếu chỉ test nhận video (Desktop gửi sang)
+        // alert("Không thể truy cập Camera. Vui lòng cấp quyền!");
     }
 }
 
@@ -357,6 +352,9 @@ function closeVideoArea() {
     if(video && video.srcObject) {
         video.srcObject.getTracks().forEach(t => t.stop());
     }
+    // Xóa ảnh cũ
+    const img = document.getElementById("remote-video-img");
+    if(img) img.src = "";
 }
 
 function endCall() {
@@ -366,6 +364,7 @@ function endCall() {
     closeVideoArea();
 }
 
+// --- XỬ LÝ KHI NHẬN CUỘC GỌI ---
 function showIncomingCall(caller) {
     const nameEl = document.getElementById("caller-name");
     const modal = document.getElementById("incoming-call-modal");
@@ -375,19 +374,45 @@ function showIncomingCall(caller) {
     }
 }
 
+// [FIX] HÀM NÀY ĐÃ ĐƯỢC SỬA ĐỂ HIỆN UI NGAY LẬP TỨC
 function acceptCall() {
     const modal = document.getElementById("incoming-call-modal");
     if (modal) modal.classList.add("hidden");
+    
     const nameEl = document.getElementById("caller-name");
+    // Lấy tên người gọi để gửi phản hồi
     const callerName = nameEl ? nameEl.innerText.replace(" đang gọi...", "") : "";
+    
+    // 1. Gửi tín hiệu chấp nhận về Server (để báo cho bên kia biết)
     if (ws) {
         ws.send(JSON.stringify({ type: "CALL_ACCEPT", recipient: callerName, sender: username }));
+    }
+
+    // 2. [QUAN TRỌNG - BỔ SUNG PHẦN NÀY]
+    // Cập nhật giao diện của chính mình ngay lập tức
+    
+    // Chuyển sang tab chat với người gọi
+    switchChat(callerName); 
+    
+    // Hiện khung video
+    const area = document.getElementById("video-area");
+    if(area) {
+        area.classList.remove("hidden");
+        // Bật camera của mình
+        startLocalVideo(); 
     }
 }
 
 function rejectCall() {
     const modal = document.getElementById("incoming-call-modal");
     if (modal) modal.classList.add("hidden");
+    
+    const nameEl = document.getElementById("caller-name");
+    const callerName = nameEl ? nameEl.innerText.replace(" đang gọi...", "") : "";
+    
+    if (ws) {
+        ws.send(JSON.stringify({ type: "CALL_REJECT", recipient: callerName, sender: username }));
+    }
 }
 
 function getAvatarColor(name) {

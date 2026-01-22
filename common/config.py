@@ -1,6 +1,7 @@
 """
-common/config.py - Cấu hình Dark Mode & Fix lỗi tương thích
+common/config.py - Cấu hình Blue/White Theme (Telegram-like) [FIXED]
 """
+
 # Server settings
 DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 5555
@@ -16,53 +17,48 @@ SOCKET_TIMEOUT = 5
 UPLOAD_TIMEOUT = 10
 
 class Colors:
-    # --- 1. MODERN DARK PALETTE (TELEGRAM STYLE) ---
-    BG_MAIN = "#0e1621"        # Nền chính (Chat area)
-    BG_SIDEBAR = "#17212b"     # Nền Sidebar, Header, Input
+    # --- BLUE & WHITE PALETTE (Dựa theo ảnh mẫu) ---
+    BG_MAIN = "#FFFFFF"         # Nền chính: Trắng
+    BG_SIDEBAR = "#FFFFFF"      # Nền danh sách chat: Trắng
+    BG_SIDEBAR_HEADER = "#0078D7" # Nền tiêu đề "Chats": Xanh dương đậm
     
     # Màu tin nhắn
-    MSG_SENT = "#2b5278"       # Bong bóng gửi đi (Xanh dương tối)
-    MSG_RECV = "#182533"       # Bong bóng nhận (Xám tối)
-    
+    MSG_SENT = "#0078D7"        # Tin gửi đi: Nền xanh (Chữ trắng)
+    MSG_RECV = "#F2F2F2"        # Tin nhận: Nền xám nhạt (Chữ đen)
+
     # Màu chữ
-    TEXT_PRIMARY = "#f5f5f5"   # Trắng sáng
-    TEXT_SECONDARY = "#7f91a4" # Xám xanh (Timestamp, Info)
+    TEXT_PRIMARY = "#000000"    # Chữ đen
+    TEXT_WHITE = "#FFFFFF"      # Chữ trắng (dùng cho header/button)
+    TEXT_SECONDARY = "#888888"  # Màu timestamp
     
     # Màu tương tác
-    ACCENT = "#5288c1"         # Màu xanh Telegram (Icon, Button)
-    BG_HOVER = "#202b36"       # Màu khi di chuột
-    INPUT_BG = "#17212b"       # Nền ô nhập liệu
+    ACCENT = "#0078D7"          # Màu nút Send, Icon
+    BG_HOVER = "#E5F3FF"        # Màu khi di chuột vào user (Xanh rất nhạt)
+    INPUT_BG = "#FFFFFF"        # Nền ô nhập liệu
     
-    # Màu đường viền & Khác
-    BORDER = "#101924"         
-    
-    # --- 2. BACKWARD COMPATIBILITY (TRÁNH LỖI CRASH) ---
-    BORDER_LIGHT = "#303841"   # Fix lỗi LoginUI cũ
-    
-    PRIMARY = ACCENT           
-    PRIMARY_HOVER = "#406ba0"  
-    
-    BG_PRIMARY = BG_MAIN       
-    BG_SECONDARY = BG_SIDEBAR  
-    
-    TEXT_LIGHT = "#FFFFFF"     
-    TEXT_DARK = "#000000"
-    
-    BUTTON_HOVER = PRIMARY_HOVER 
-    
-    SUCCESS = "#4BB543"
+    # Viền
+    BORDER = "#D9D9D9"          # Viền xám nhẹ
+    BORDER_LIGHT = "#E0E0E0"    # [FIX] Thêm biến này để LoginUI không bị lỗi
+
+    # --- Backward Compatibility ---
+    PRIMARY = ACCENT
+    BG_PRIMARY = BG_MAIN
+    BG_SECONDARY = BG_SIDEBAR
+    TEXT_LIGHT = TEXT_WHITE
+    TEXT_DARK = TEXT_PRIMARY
+    SUCCESS = "#36A420"
     ERROR = "#FF3B30"
-    WARNING = "#FF9500"
+    WARNING = "#FFCC00"
 
 class UISettings:
-    WINDOW_WIDTH = 1100
-    WINDOW_HEIGHT = 750
+    WINDOW_WIDTH = 1000
+    WINDOW_HEIGHT = 700
     MIN_WIDTH = 800
     MIN_HEIGHT = 600
-    
+
     # Fonts
     FONT_TITLE = ("Segoe UI", 24, "bold")
-    FONT_HEADER = ("Segoe UI", 14, "bold")
-    FONT_NAME = ("Segoe UI", 11, "bold")
-    FONT_NORMAL = ("Segoe UI", 10)
+    FONT_HEADER = ("Segoe UI", 14, "bold")      
+    FONT_CHAT_NAME = ("Segoe UI", 16, "bold")   
+    FONT_NORMAL = ("Segoe UI", 11)
     FONT_SMALL = ("Segoe UI", 9)
