@@ -1,9 +1,9 @@
 """
-Cấu hình chung cho ứng dụng chat
+common/config.py - Cấu hình Blue/White Theme (Telegram-like) [FIXED]
 """
 
 # Server settings
-DEFAULT_HOST = "localhost"
+DEFAULT_HOST = "0.0.0.0"
 DEFAULT_PORT = 5555
 DEFAULT_SERVER = "127.0.0.1:5555"
 
@@ -12,34 +12,53 @@ CLIENT_DOWNLOAD_DIR = "client_downloads"
 SERVER_STORAGE_DIR = "server_files"
 
 # Network settings
-CHUNK_SIZE = 8192  # 8KB chunks cho file transfer
-SOCKET_TIMEOUT = 5  # Timeout cho kết nối ban đầu
-UPLOAD_TIMEOUT = 10  # Timeout cho việc đợi server response khi upload
+CHUNK_SIZE = 8192
+SOCKET_TIMEOUT = 5
+UPLOAD_TIMEOUT = 10
 
-# UI Colors (Zalo-like)
 class Colors:
-    BG_PRIMARY = "#0068FF"
-    BG_SECONDARY = "#F0F2F5"
-    BG_WHITE = "#FFFFFF"
-    TEXT_PRIMARY = "#000000"
-    TEXT_SECONDARY = "#65676B"
-    MESSAGE_SENT = "#0084FF"
-    MESSAGE_RECEIVED = "#E4E6EB"
+    # --- BLUE & WHITE PALETTE (Dựa theo ảnh mẫu) ---
+    BG_MAIN = "#FFFFFF"         # Nền chính: Trắng
+    BG_SIDEBAR = "#FFFFFF"      # Nền danh sách chat: Trắng
+    BG_SIDEBAR_HEADER = "#0078D7" # Nền tiêu đề "Chats": Xanh dương đậm
+    
+    # Màu tin nhắn
+    MSG_SENT = "#0078D7"        # Tin gửi đi: Nền xanh (Chữ trắng)
+    MSG_RECV = "#F2F2F2"        # Tin nhận: Nền xám nhạt (Chữ đen)
 
-# UI Settings
+    # Màu chữ
+    TEXT_PRIMARY = "#000000"    # Chữ đen
+    TEXT_WHITE = "#FFFFFF"      # Chữ trắng (dùng cho header/button)
+    TEXT_SECONDARY = "#888888"  # Màu timestamp
+    
+    # Màu tương tác
+    ACCENT = "#0078D7"          # Màu nút Send, Icon
+    BG_HOVER = "#E5F3FF"        # Màu khi di chuột vào user (Xanh rất nhạt)
+    INPUT_BG = "#FFFFFF"        # Nền ô nhập liệu
+    
+    # Viền
+    BORDER = "#D9D9D9"          # Viền xám nhẹ
+    BORDER_LIGHT = "#E0E0E0"    # [FIX] Thêm biến này để LoginUI không bị lỗi
+
+    # --- Backward Compatibility ---
+    PRIMARY = ACCENT
+    BG_PRIMARY = BG_MAIN
+    BG_SECONDARY = BG_SIDEBAR
+    TEXT_LIGHT = TEXT_WHITE
+    TEXT_DARK = TEXT_PRIMARY
+    SUCCESS = "#36A420"
+    ERROR = "#FF3B30"
+    WARNING = "#FFCC00"
+
 class UISettings:
     WINDOW_WIDTH = 1000
     WINDOW_HEIGHT = 700
     MIN_WIDTH = 800
     MIN_HEIGHT = 600
-    SIDEBAR_WIDTH = 280
-    CHAT_HEADER_HEIGHT = 60
-    INPUT_AREA_HEIGHT = 80
-    
+
     # Fonts
-    FONT_TITLE = ("Arial", 32, "bold")
-    FONT_HEADER = ("Arial", 18, "bold")
-    FONT_NORMAL = ("Arial", 11)
-    FONT_MESSAGE = ("Arial", 10)
-    FONT_SMALL = ("Arial", 9)
-    FONT_TINY = ("Arial", 8)
+    FONT_TITLE = ("Segoe UI", 24, "bold")
+    FONT_HEADER = ("Segoe UI", 14, "bold")      
+    FONT_CHAT_NAME = ("Segoe UI", 16, "bold")   
+    FONT_NORMAL = ("Segoe UI", 11)
+    FONT_SMALL = ("Segoe UI", 9)

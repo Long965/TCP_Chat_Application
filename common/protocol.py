@@ -1,5 +1,5 @@
 """
-Protocol cho ứng dụng chat - Định nghĩa cấu trúc message
+Protocol cho ứng dụng chat - Định nghĩa cấu trúc message (FULL FIXED)
 """
 
 import json
@@ -10,46 +10,43 @@ class MessageType:
     # Authentication
     LOGIN = "LOGIN"
     LOGIN_SUCCESS = "LOGIN_SUCCESS"
-    LOGIN_FAILED = "LOGIN_FAILED"
+    LOGIN_FAILURE = "LOGIN_FAILURE"
     
     # Text messages
     TEXT = "TEXT"
-    PRIVATE_TEXT = "PRIVATE_TEXT"  # NEW: Tin nhắn riêng tư
+    PRIVATE_TEXT = "PRIVATE_TEXT"
     
     # File transfer
     FILE_UPLOAD = "FILE_UPLOAD"
     FILE_DOWNLOAD = "FILE_DOWNLOAD"
     FILE_INFO = "FILE_INFO"
-    FILE_CHUNK = "FILE_CHUNK"
+    FILE_DATA = "FILE_DATA"
+    FILE_CHUNK = "FILE_CHUNK"      
     FILE_COMPLETE = "FILE_COMPLETE"
     FILE_ERROR = "FILE_ERROR"
     
     # User management
-    USER_LIST = "USER_LIST"
-    USER_ONLINE = "USER_ONLINE"
-    USER_OFFLINE = "USER_OFFLINE"
-    USER_INFO = "USER_INFO"  # NEW: Thông tin user
+    LIST_USERS = "LIST_USERS"
+    USER_INFO = "USER_INFO"
     
-    # Video/Audio Call - NEW
-    CALL_REQUEST = "CALL_REQUEST"           # Yêu cầu gọi
-    CALL_ACCEPT = "CALL_ACCEPT"             # Chấp nhận cuộc gọi
-    CALL_REJECT = "CALL_REJECT"             # Từ chối cuộc gọi
-    CALL_END = "CALL_END"                   # Kết thúc cuộc gọi
-    CALL_BUSY = "CALL_BUSY"                 # Đang bận
+    # Video/Audio Call & WebRTC
+    CALL_REQUEST = "CALL_REQUEST"
+    CALL_ACCEPT = "CALL_ACCEPT"
+    CALL_REJECT = "CALL_REJECT"
+    CALL_END = "CALL_END"
+    CALL_BUSY = "CALL_BUSY"
     
-    # Media Data - THÊM MỚI
-    VIDEO_DATA = "VIDEO_DATA"      # Dữ liệu hình ảnh (Frame)
-    AUDIO_DATA = "AUDIO_DATA"      # Dữ liệu âm thanh (Chunk)
+    # [QUAN TRỌNG] Thêm dòng này để sửa lỗi AttributeError
+    CALL_ICE_CANDIDATE = "CALL_ICE_CANDIDATE" 
     
-    # WebRTC Signaling
-    WEBRTC_OFFER = "WEBRTC_OFFER"           # SDP Offer
-    WEBRTC_ANSWER = "WEBRTC_ANSWER"         # SDP Answer
-    WEBRTC_ICE = "WEBRTC_ICE"               # ICE Candidate
+    # Media Data
+    VIDEO_DATA = "VIDEO_DATA"
+    AUDIO_DATA = "AUDIO_DATA"
     
     # System
+    ERROR = "ERROR"
     PING = "PING"
     PONG = "PONG"
-    ERROR = "ERROR"
 
 class Protocol:
     """Xử lý encode/decode message"""
@@ -68,6 +65,7 @@ class Protocol:
             "data": data
         }
         
+        # ensure_ascii=False để hỗ trợ tiếng Việt
         json_str = json.dumps(message, ensure_ascii=False)
         json_bytes = json_str.encode(Protocol.ENCODING)
         
@@ -96,6 +94,7 @@ class Protocol:
         Nhận message hoàn chỉnh từ socket
         Returns: (msg_type, data) hoặc (None, None) nếu disconnect
         """
+        if not sock: return None, None
         try:
             # Đọc header (4 bytes)
             header = Protocol._recv_exact(sock, Protocol.HEADER_SIZE)
@@ -114,7 +113,6 @@ class Protocol:
             return Protocol.decode_message(msg_data)
             
         except Exception as e:
-            print(f"Error receiving message: {e}")
             return None, None
     
     @staticmethod
@@ -122,15 +120,19 @@ class Protocol:
         """Nhận chính xác n bytes từ socket"""
         data = bytearray()
         while len(data) < n:
-            packet = sock.recv(n - len(data))
-            if not packet:
+            try:
+                packet = sock.recv(n - len(data))
+                if not packet:
+                    return None
+                data.extend(packet)
+            except:
                 return None
-            data.extend(packet)
         return bytes(data)
     
     @staticmethod
     def send_message(sock, msg_type, data):
         """Gửi message qua socket"""
+        if not sock: return False
         try:
             message = Protocol.encode_message(msg_type, data)
             sock.sendall(message)
@@ -138,3 +140,14 @@ class Protocol:
         except Exception as e:
             print(f"Error sending message: {e}")
             return False
+    
+    # Helper cho Base64 (nếu cần dùng cho file cũ)
+    @staticmethod
+    def encode_base64(data_bytes):
+        import base64
+        return base64.b64encode(data_bytes).decode('utf-8')
+
+    @staticmethod
+    def decode_base64(data_str):
+        import base64
+        return base64.b64decode(data_str.encode('utf-8'))

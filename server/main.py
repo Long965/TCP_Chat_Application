@@ -1,28 +1,125 @@
-"""
-Entry point cho Server Application
-"""
 import sys
 import os
+import shutil
+from datetime import datetime
+from contextlib import asynccontextmanager
+import asyncio 
 
-# Thêm thư mục gốc vào path để import được common
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# --- CẤU HÌNH ĐƯỜNG DẪN ---
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.append(parent_dir)
 
-from server.server_core import ChatServer
-from common.config import DEFAULT_HOST, DEFAULT_PORT
+import uvicorn
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Form
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
-def main():
-    """Khởi chạy server"""
-    server = ChatServer(host=DEFAULT_HOST, port=DEFAULT_PORT)
-    
+from server.bridge import global_bridge
+from server.tcp_server_thread import TCPServer
+from common.config import SERVER_STORAGE_DIR
+
+os.makedirs(SERVER_STORAGE_DIR, exist_ok=True)
+
+# --- LIFESPAN ---
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Lấy hoặc tạo event loop cho TCP Server chạy nền
     try:
-        server.start()
-    except KeyboardInterrupt:
-        print("\n⏹️  Shutting down server...")
-        server.stop()
+        main_loop = asyncio.get_running_loop()
+    except RuntimeError:
+        main_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(main_loop)
+
+    tcp_thread = TCPServer(main_loop)
+    tcp_thread.daemon = True 
+    tcp_thread.start()
+    
+    print("\n" + "="*40)
+    print("✅ FULL-STACK SERVER ĐÃ SẴN SÀNG!")
+    print(f"   🌐 Web Client:     http://localhost:8000")
+    print(f"   💻 Desktop Client: 127.0.0.1:5555")
+    print("="*40 + "\n")
+    
+    yield 
+    print("🛑 Server đang tắt...")
+
+app = FastAPI(lifespan=lifespan)
+
+# --- CẤU HÌNH STATIC FILES ---
+static_dir = os.path.join(parent_dir, "static")
+if not os.path.exists(static_dir):
+    os.makedirs(static_dir)
+
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+app.mount("/downloads", StaticFiles(directory=SERVER_STORAGE_DIR), name="downloads")
+
+@app.get("/")
+async def get():
+    return FileResponse(os.path.join(static_dir, 'index.html'))
+
+# --- API UPLOAD FILE (GIỮ LẠI ĐỂ TƯƠNG THÍCH DESKTOP/FALLBACK) ---
+@app.post("/upload")
+async def upload_file(
+    file: UploadFile = File(...), 
+    username: str = Form(...),
+    recipient: str = Form(None)
+):
+    try:
+        if recipient == "None" or recipient == "":
+            recipient = None
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        safe_filename = f"{timestamp}_{file.filename}"
+        file_path = os.path.join(SERVER_STORAGE_DIR, safe_filename)
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        file_size = os.path.getsize(file_path)
+        
+        file_info_msg = {
+            "type": "FILE_INFO",
+            "sender": username,
+            "recipient": recipient,
+            "filename": safe_filename,
+            "original_filename": file.filename,
+            "filesize": file_size,
+            "file_type": "image" if file.content_type.startswith("image/") else "file",
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        await global_bridge.handle_message(file_info_msg, sender=username)
+        
+        return {"status": "success", "filename": safe_filename}
+        
     except Exception as e:
-        print(f"❌ Error: {e}")
-        server.stop()
-        sys.exit(1)
+        print(f"Upload Error: {e}")
+        return {"status": "error", "message": str(e)}
+
+# --- WEBSOCKET CHAT (ĐÃ CẬP NHẬT ĐỂ HỖ TRỢ UPLOAD STREAM) ---
+@app.websocket("/ws/{username}")
+async def websocket_endpoint(websocket: WebSocket, username: str):
+    """
+    Endpoint chính xử lý kết nối Web.
+    """
+    # 1. Đăng ký user vào Bridge
+    await global_bridge.add_web(username, websocket)
+    
+    # 2. Gửi danh sách user cập nhật
+    try:
+        users = list(global_bridge.tcp_clients.keys()) + list(global_bridge.web_clients.keys())
+        # Gửi riêng cho người mới
+        await websocket.send_json({"type": "SYSTEM", "users": users})
+        # Thông báo cho mọi người
+        await global_bridge.broadcast({"type": "SYSTEM", "users": users})
+    except: pass
+
+    # 3. [FIX QUAN TRỌNG] Chuyển giao việc lắng nghe cho Bridge
+    # Hàm listen_to_web_user (trong bridge.py) sử dụng `receive()` thay vì `receive_json()`
+    # giúp nhận được cả Text (Chat) và Binary (File Upload từ script.js mới)
+    await global_bridge.listen_to_web_user(username)
 
 if __name__ == "__main__":
-    main()
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
