@@ -104,17 +104,23 @@ class TCPServer(threading.Thread):
 
     def _update_user_lists(self):
         """Cập nhật danh sách online cho tất cả mọi người"""
-        users = list(global_bridge.tcp_clients.keys()) + list(global_bridge.web_clients.keys())
-        
-        # 1. Gửi cho Web Clients
+        # Lấy tất cả user từ cả TCP (Desktop) và Web
+        all_users = list(global_bridge.tcp_clients.keys()) + list(global_bridge.web_clients.keys())
+
+        # [FIX] Lọc bỏ các user ảo dùng để upload (có chứa "_upload_")
+        # Điều này giúp Desktop Client không bị hiện các tên rác như "User_upload_123"
+        users = [u for u in all_users if "_upload_" not in u]
+
+        # 1. Gửi cho Web Clients (thông qua Bridge)
         self._run_on_main_loop(global_bridge.broadcast({"type": "SYSTEM", "users": users}))
-        
-        # 2. Gửi cho TCP Clients
+
+        # 2. Gửi cho TCP Clients (Desktop App)
         msg_data = {"users": users}
         for sock in global_bridge.tcp_clients.values():
-            try: 
+            try:
                 Protocol.send_message(sock, MessageType.LIST_USERS, msg_data)
-            except: pass
+            except: 
+                pass
 
     def _run_on_main_loop(self, coro):
         """Helper để chạy Coroutine trên Main Thread"""

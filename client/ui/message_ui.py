@@ -1,6 +1,3 @@
-"""
-client/ui/message_ui.py
-"""
 import tkinter as tk
 from tkinter import Frame, Label, Button, LEFT, RIGHT, W, E, ttk
 from datetime import datetime
@@ -18,7 +15,7 @@ class MessageUI:
     def display_text_message(parent, msg, is_sender, colors):
         """Hiển thị tin nhắn văn bản"""
         bg = colors.MSG_SENT if is_sender else colors.MSG_RECV
-        fg = "white" if is_sender else "black" # Chữ trắng nếu là tin gửi đi (nền xanh)
+        fg = "white" if is_sender else "black"
         anchor = E if is_sender else W
         
         wrapper = Frame(parent, bg=colors.BG_MAIN)
@@ -27,7 +24,7 @@ class MessageUI:
         bubble = Frame(wrapper, bg=bg, padx=12, pady=8)
         bubble.pack(side=RIGHT if is_sender else LEFT, anchor=anchor)
 
-        # Hiện tên người gửi nếu là tin nhắn nhóm và không phải mình
+        # Hiện tên người gửi (nếu là nhóm)
         if not is_sender and not msg.get("recipient"):
             Label(bubble, text=msg.get("sender"), font=("Segoe UI", 9, "bold"),
                   bg=bg, fg="#555").pack(anchor="w", pady=(0, 2))
@@ -41,7 +38,7 @@ class MessageUI:
 
     @staticmethod
     def display_file_message(parent, msg, is_sender, colors, download_callback=None):
-        """Hiển thị tin nhắn file"""
+        """Hiển thị tin nhắn file (Bong bóng tĩnh)"""
         bg = colors.MSG_SENT if is_sender else colors.MSG_RECV
         fg = "white" if is_sender else "black"
         anchor = E if is_sender else W
@@ -59,6 +56,7 @@ class MessageUI:
         row = Frame(bubble, bg=bg)
         row.pack(fill="x")
 
+        # Xác định icon
         file_type = msg.get("file_type", "file")
         icon_char = "🖼️" if file_type and "image" in file_type else "📄"
 
@@ -67,95 +65,115 @@ class MessageUI:
         info = Frame(row, bg=bg)
         info.pack(side=LEFT, padx=10)
         
-        filename = msg.get("original_filename", "File")
-        if len(filename) > 25: filename = filename[:22] + "..."
+        filename = msg.get("original_filename", msg.get("filename", "File"))
+        # Cắt ngắn tên file nếu quá dài
+        display_name = (filename[:20] + '...') if len(filename) > 23 else filename
         
-        Label(info, text=filename, font=("Segoe UI", 10, "bold"), bg=bg, fg=fg).pack(anchor="w")
-        Label(info, text=f"{msg.get('filesize', 0)/1024:.1f} KB", font=("Segoe UI", 9), 
+        Label(info, text=display_name, font=("Segoe UI", 10, "bold"), bg=bg, fg=fg).pack(anchor="w")
+        
+        # Format filesize
+        size_kb = msg.get('filesize', 0) / 1024
+        size_str = f"{size_kb:.1f} KB" if size_kb < 1024 else f"{size_kb/1024:.2f} MB"
+        
+        Label(info, text=size_str, font=("Segoe UI", 9), 
               bg=bg, fg="#DDD" if is_sender else "#666").pack(anchor="w")
 
-        def on_click():
-            if download_callback: download_callback(msg)
-            
-        btn_fg = "white" if is_sender else colors.ACCENT
-        Button(row, text="⬇", font=("Arial", 12, "bold"), bg=bg, fg=btn_fg, bd=0,
-               activebackground=bg, cursor="hand2", command=on_click).pack(side=LEFT, padx=5)
-               
+        # Nút Download (Chỉ hiện khi là người nhận)
+        if not is_sender:
+            def on_click():
+                if download_callback: download_callback(msg)
+                
+            Button(row, text="⬇", font=("Arial", 12, "bold"), bg=bg, fg=colors.ACCENT, bd=0,
+                   activebackground=bg, cursor="hand2", command=on_click).pack(side=LEFT, padx=5)
+                
         Label(bubble, text=MessageUI._format_time(msg.get("timestamp")),
               font=("Segoe UI", 8), bg=bg, fg="#DDD" if is_sender else "#888").pack(anchor="e", pady=(5,0))
 
     @staticmethod
-    def display_upload_progress(parent, filename, filesize, control_callbacks):
+    def display_upload_progress(parent, filename, filesize, callbacks, is_download=False):
         """
-        Hiển thị thanh tiến trình upload (Progress Bar + Pause/Resume + Cancel)
+        Hiển thị thanh tiến trình Upload/Download động.
+        Hỗ trợ: Pause, Resume, Cancel.
         """
-        # Upload luôn dùng màu sent (Xanh dương)
-        bg = Colors.MSG_SENT
-        fg = "white"
+        # Màu sắc phân biệt Upload (Xanh dương) vs Download (Xanh lá)
+        theme_color = Colors.MSG_SENT if not is_download else "#E8F5E9" # Xanh lá nhạt
+        text_color = "white" if not is_download else "black"
+        status_prefix = "📤 Đang gửi" if not is_download else "📥 Đang tải"
         
         wrapper = Frame(parent, bg=Colors.BG_MAIN)
         wrapper.pack(fill="x", pady=5, padx=15)
         
-        # Bubble
-        bubble = Frame(wrapper, bg=bg, padx=10, pady=8)
-        bubble.pack(side=RIGHT, anchor=E)
+        # Căn lề: Upload bên Phải, Download bên Trái (hoặc giữ nguyên bên phải để dễ nhìn)
+        side = RIGHT if not is_download else RIGHT 
         
-        # Info
-        Label(bubble, text=f"📤 Đang gửi: {filename}", font=("Segoe UI", 10, "bold"), 
-              bg=bg, fg=fg).pack(anchor="w")
+        bubble = Frame(wrapper, bg=theme_color, padx=10, pady=8, bd=1, relief="solid" if is_download else "flat")
+        bubble.pack(side=side, anchor=E)
+        
+        # Dòng tiêu đề
+        lbl_title = Label(bubble, text=f"{status_prefix}: {filename}", font=("Segoe UI", 9, "bold"), 
+              bg=theme_color, fg=text_color)
+        lbl_title.pack(anchor="w")
 
         # Progress Bar Style
         style = ttk.Style()
         style.theme_use('clam')
-        style.configure("upload.Horizontal.TProgressbar", background=Colors.SUCCESS, 
-                        troughcolor="#E0E0E0", borderwidth=0)
+        # Tạo style riêng cho bar này
+        bar_style = "upload.Horizontal.TProgressbar"
+        style.configure(bar_style, background=Colors.SUCCESS, troughcolor="#E0E0E0", borderwidth=0)
 
-        progress = ttk.Progressbar(bubble, style="upload.Horizontal.TProgressbar", 
-                                   orient="horizontal", length=200, mode="determinate")
+        progress = ttk.Progressbar(bubble, style=bar_style, orient="horizontal", length=220, mode="determinate")
         progress.pack(fill="x", pady=5)
 
         # Stats & Controls
-        ctrl_frame = Frame(bubble, bg=bg)
+        ctrl_frame = Frame(bubble, bg=theme_color)
         ctrl_frame.pack(fill="x")
 
-        size_lbl = Label(ctrl_frame, text="0%", font=("Segoe UI", 9), bg=bg, fg="#DDD")
+        size_lbl = Label(ctrl_frame, text="0%", font=("Segoe UI", 8), bg=theme_color, fg=text_color)
         size_lbl.pack(side=LEFT)
         
-        # Logic nút bấm
+        # --- Logic điều khiển ---
         state = {"paused": False}
         
         def toggle_pause():
             state["paused"] = not state["paused"]
             if state["paused"]:
-                btn_pause.config(text="▶", bg=Colors.WARNING) # Màu vàng khi pause
-                control_callbacks['pause']()
+                btn_pause.config(text="▶", fg="orange")
+                lbl_title.config(text=f"⏸ Đã tạm dừng: {filename}")
+                callbacks['pause']()
             else:
-                btn_pause.config(text="⏸", bg=bg) # Màu gốc
-                control_callbacks['resume']()
+                btn_pause.config(text="⏸", fg=text_color)
+                lbl_title.config(text=f"{status_prefix}: {filename}")
+                callbacks['resume']()
 
-        def cancel_upload():
-            control_callbacks['cancel']()
+        def cancel_action():
+            callbacks['cancel']()
             wrapper.destroy()
 
-        # Nút Cancel
-        Button(ctrl_frame, text="❌", font=("Segoe UI", 9), bg=bg, fg="white", bd=0, 
-               activebackground=bg, cursor="hand2", command=cancel_upload).pack(side=RIGHT, padx=2)
+        # Nút Cancel (Stop)
+        Button(ctrl_frame, text="⏹", font=("Segoe UI", 9), bg=theme_color, fg="red" if is_download else "#FFCCCC", bd=0, 
+               activebackground=theme_color, cursor="hand2", command=cancel_action).pack(side=RIGHT, padx=2)
 
-        # Nút Pause
-        btn_pause = Button(ctrl_frame, text="⏸", font=("Segoe UI", 9), bg=bg, fg="white", bd=0, 
-                           activebackground=bg, cursor="hand2", command=toggle_pause)
+        # Nút Pause/Resume
+        btn_pause = Button(ctrl_frame, text="⏸", font=("Segoe UI", 9), bg=theme_color, fg=text_color, bd=0, 
+                           activebackground=theme_color, cursor="hand2", command=toggle_pause)
         btn_pause.pack(side=RIGHT, padx=2)
 
-        def update_progress(sent):
+        # Hàm update UI (trả về cho FileHandler gọi)
+        def update_progress(current_bytes):
             try:
-                if not wrapper.winfo_exists():
-                    return
-                percent = (sent / filesize) * 100
+                # Kiểm tra widget còn tồn tại không
+                if not wrapper.winfo_exists(): return
+                
+                percent = (current_bytes / filesize) * 100
                 progress['value'] = percent
                 size_lbl.config(text=f"{int(percent)}%")
 
-                if sent >= filesize:
-                    wrapper.after(500, lambda: wrapper.destroy() if wrapper.winfo_exists() else None)
+                # Khi hoàn tất
+                if current_bytes >= filesize:
+                    lbl_title.config(text=f"✅ Hoàn tất: {filename}")
+                    btn_pause.destroy() # Ẩn nút pause
+                    # Tự động đóng thanh progress sau 2s
+                    wrapper.after(2000, lambda: wrapper.destroy() if wrapper.winfo_exists() else None)
             except Exception:
                 pass
         

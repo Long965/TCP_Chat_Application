@@ -25,7 +25,7 @@ class ClientApp:
     def __init__(self):
         # 1. Setup Window
         self.root = Tk()
-        self.root.title("Zalo Desktop (Dark Mode)")
+        self.root.title("TCP Chat Application")
         self.root.geometry(f"{UISettings.WINDOW_WIDTH}x{UISettings.WINDOW_HEIGHT}")
         self.root.minsize(UISettings.MIN_WIDTH, UISettings.MIN_HEIGHT)
         self.root.configure(bg=Colors.BG_MAIN)

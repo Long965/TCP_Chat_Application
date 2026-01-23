@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zalo Dark - Chat & Video</title>
+    <title> WebSocket-Chat </title>
     <link rel="stylesheet" href="/static/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
@@ -75,8 +75,7 @@
             </div>
 
             <div class="input-area">
-                <input type="file" id="file-input" hidden onchange="uploadFile()">
-                
+                <input type="file" id="file-input" hidden multiple onchange="uploadFiles()">                
                 <button class="action-btn attach-btn" onclick="document.getElementById('file-input').click()" title="Gửi file">
                     <i class="fas fa-paperclip"></i>
                 </button>

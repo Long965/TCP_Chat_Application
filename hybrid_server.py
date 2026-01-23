@@ -71,7 +71,7 @@ async def upload_file(
         print(f"Upload Error: {e}")
         return {"status": "error", "message": str(e)}
 
-# --- WEBSOCKET CHAT (ĐÃ SỬA LỖI MẤT KẾT NỐI) ---
+# --- WEBSOCKET CHAT ---
 @app.websocket("/ws/{username}")
 async def websocket_endpoint(websocket: WebSocket, username: str):
     """Xử lý kết nối từ Web Client"""
@@ -81,13 +81,20 @@ async def websocket_endpoint(websocket: WebSocket, username: str):
     
     # 2. Gửi danh sách user hiện tại cho người mới vào
     try:
-        users = list(global_bridge.tcp_clients.keys()) + list(global_bridge.web_clients.keys())
-        await websocket.send_json({"type": "SYSTEM", "users": users})
+        # Lấy tất cả user đang kết nối (bao gồm cả user upload ẩn)
+        all_users = list(global_bridge.tcp_clients.keys()) + list(global_bridge.web_clients.keys())
         
-        # Thông báo cho mọi người có user mới online
-        await global_bridge.broadcast({"type": "SYSTEM", "users": users})
+        # [FIX QUAN TRỌNG] Lọc bỏ các user ảo dùng để upload
+        # Chỉ lấy những user KHÔNG chứa chữ "_upload_"
+        real_users = [u for u in all_users if "_upload_" not in u]
+
+        # Gửi danh sách ĐÃ LỌC
+        await websocket.send_json({"type": "SYSTEM", "users": real_users})
+        
+        # Thông báo cho mọi người có user mới online (Gửi danh sách sạch)
+        await global_bridge.broadcast({"type": "SYSTEM", "users": real_users})
     except: pass
 
-    # 3. [FIX QUAN TRỌNG] Chuyển giao việc lắng nghe cho Bridge
+    # 3. Chuyển giao việc lắng nghe cho Bridge
     # Hàm này sẽ xử lý cả JSON (Chat) và Bytes (File Upload) mà không bị lỗi
     await global_bridge.listen_to_web_user(username)
