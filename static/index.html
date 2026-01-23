@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title> WebSocket-Chat </title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+
+    <div id="login-screen">
+        <div class="login-box">
+            <i class="fab fa-telegram-plane login-icon"></i>
+            <h2>Đăng nhập</h2>
+            <p>Nhập tên hiển thị để tham gia</p>
+            <input type="text" id="username-input" placeholder="Tên của bạn..." autocomplete="off">
+            <button onclick="joinChat()">BẮT ĐẦU</button>
+        </div>
+    </div>
+
+    <div id="app" class="hidden">
+        
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <div class="search-box">
+                    <i class="fas fa-search search-icon"></i>
+                    <input type="text" placeholder="Tìm kiếm...">
+                </div>
+            </div>
+            <ul id="user-list">
+                </ul>
+        </div>
+
+        <div class="main-chat">
+            
+            <div class="chat-header">
+                <div class="header-info">
+                    <h3 id="chat-title">Trò chuyện nhóm</h3>
+                    <p id="chat-status">Trực tuyến</p>
+                </div>
+                <div class="header-actions">
+                    <button onclick="toggleVideo()" title="Gọi Video"><i class="fas fa-video"></i></button>
+                    <button title="Tùy chọn"><i class="fas fa-ellipsis-v"></i></button>
+                </div>
+            </div>
+
+            <div id="video-area" class="hidden">
+                <div class="video-remote-container">
+                    <img id="remote-video-img" alt="Đang chờ hình ảnh...">
+                    <div class="video-label">Người khác</div>
+                </div>
+
+                <div class="video-local-container">
+                    <video id="local-video" autoplay muted playsinline></video>
+                    <div class="video-label">Bạn</div>
+                </div>
+
+                <button onclick="endCall()" class="btn-hangup" title="Kết thúc">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+            </div>
+
+            <div id="messages" class="messages-area"></div>
+
+            <div id="upload-progress-container" class="hidden">
+                <div class="upload-header">
+                    <span id="upload-filename">Đang tải file...</span>
+                    <span id="upload-percent">0%</span>
+                </div>
+                <div class="progress-track">
+                    <div id="upload-bar"></div>
+                </div>
+                <button onclick="cancelWebUpload()" class="btn-cancel-upload">HỦY UPLOAD</button>
+            </div>
+
+            <div class="input-area">
+                <input type="file" id="file-input" hidden multiple onchange="uploadFiles()">                
+                <button class="action-btn attach-btn" onclick="document.getElementById('file-input').click()" title="Gửi file">
+                    <i class="fas fa-paperclip"></i>
+                </button>
+
+                <input type="text" id="message-input" placeholder="Viết tin nhắn..." onkeypress="handleEnter(event)" autocomplete="off">
+
+                <button class="action-btn send-btn" onclick="sendMessage()" title="Gửi">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="incoming-call-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="call-avatar">
+                <i class="fas fa-video"></i>
+            </div>
+            <h3 id="caller-name" style="color: white; margin-bottom: 5px;">User đang gọi...</h3>
+            <p style="color: #7f91a4;">Cuộc gọi video đến</p>
+            
+            <div class="modal-actions">
+                <button onclick="rejectCall()" class="btn-call btn-reject" title="Từ chối">
+                    <i class="fas fa-phone-slash"></i>
+                </button>
+                <button onclick="acceptCall()" class="btn-call btn-accept" title="Trả lời">
+                    <i class="fas fa-phone"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>

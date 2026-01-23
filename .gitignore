@@ -1,0 +1,6 @@
+*.mp4
+server/server_files/*
+!server/server_files/.gitkeep
+__pycache__/
+*.pyc
+venv/
